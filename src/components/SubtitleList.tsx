@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { SubtitleSegment, SubtitleResponse } from '../types';
+import { convertToSRT, downloadSRT } from '../utils/subtitleUtils';
 
 interface SubtitleListProps {
   subtitleData: SubtitleResponse;
@@ -28,12 +29,36 @@ function formatDuration(seconds: number): string {
 
 const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) => {
   const [copySuccess, setCopySuccess] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'segments' | 'fulltext'>('fulltext');
 
   const segments = subtitleData.data?.segments || [];
   const fullText = subtitleData.data?.fullText || '';
   const totalDuration = subtitleData.data?.totalDuration || 0;
   const segmentCount = subtitleData.data?.segmentCount || 0;
+
+  const generateFileName = useCallback(() => {
+    if (taskInfo?.programName && taskInfo?.episodeNumber) {
+      return `${taskInfo.programName}_第${taskInfo.episodeNumber}期.srt`;
+    }
+    if (taskInfo?.fileName) {
+      const baseName = taskInfo.fileName.replace(/\.[^/.]+$/, '');
+      return `${baseName}.srt`;
+    }
+    return 'subtitle.srt';
+  }, [taskInfo]);
+
+  const handleExportSRT = useCallback(() => {
+    try {
+      const srtContent = convertToSRT(segments);
+      const fileName = generateFileName();
+      downloadSRT(srtContent, fileName);
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 2000);
+    } catch (err) {
+      console.error('导出失败:', err);
+    }
+  }, [segments, generateFileName]);
 
   const handleCopyFullText = useCallback(async () => {
     try {
@@ -92,6 +117,15 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
           <span className="summary-item">
             <strong>语言：</strong>中文
           </span>
+        </div>
+        <div className="subtitle-actions">
+          <button
+            type="button"
+            className="export-btn"
+            onClick={handleExportSRT}
+          >
+            {exportSuccess ? '✓ 已导出' : '📥 导出 SRT'}
+          </button>
         </div>
       </div>
 

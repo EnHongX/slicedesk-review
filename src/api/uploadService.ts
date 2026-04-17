@@ -46,6 +46,7 @@ export const uploadService = {
                 fileName: audioFile.name,
                 programName,
                 episodeNumber,
+                sliceDurationSeconds: parseFloat(sliceDurationSeconds) || 60,
                 taskType
               }
             });
