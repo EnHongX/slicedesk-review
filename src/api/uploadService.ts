@@ -1,4 +1,4 @@
-import { UploadFormData, UploadResponse, UploadError, SlicesResponse, SubtitleResponse } from '../types';
+import { UploadFormData, UploadResponse, UploadError, SlicesResponse, SubtitleResponse, TranslationResponse } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -124,6 +124,33 @@ export const uploadService = {
         const errorData = await response.json().catch(() => ({}));
         throw {
           message: errorData.message || '获取字幕失败',
+          code: `HTTP_${response.status}`
+        } as UploadError;
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw {
+          message: error.message,
+          code: 'NETWORK_ERROR'
+        } as UploadError;
+      }
+      throw error;
+    }
+  },
+
+  async getTaskTranslation(taskId: string, targetLang: string = 'en'): Promise<TranslationResponse> {
+    try {
+      const url = new URL(`${API_BASE_URL}/task/${taskId}/translate`);
+      url.searchParams.append('targetLang', targetLang);
+      
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw {
+          message: errorData.message || '翻译失败',
           code: `HTTP_${response.status}`
         } as UploadError;
       }

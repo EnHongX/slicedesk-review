@@ -108,3 +108,27 @@ export interface SubtitleResponse {
     segments: SubtitleSegment[];
   };
 }
+
+export interface TranslatedSegment {
+  index: number;
+  startTime: number;
+  endTime: number;
+  originalText: string;
+  translatedText: string;
+  confidence?: number;
+}
+
+export interface TranslationResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    taskId: string;
+    sourceLanguage: string;
+    targetLanguage: string;
+    totalDuration: number;
+    segmentCount: number;
+    fullOriginalText: string;
+    fullTranslatedText: string;
+    segments: TranslatedSegment[];
+  };
+}
