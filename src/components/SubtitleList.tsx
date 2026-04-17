@@ -108,28 +108,40 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
   }, []);
 
   const handleTranslate = useCallback(async () => {
-    if (!taskId || isTranslating) return;
+    if (isTranslating) return;
+    
+    if (!taskId) {
+      setTranslationError('无法获取任务ID，请刷新页面重试');
+      console.error('翻译失败: taskId 不存在', subtitleData);
+      return;
+    }
     
     setIsTranslating(true);
     setTranslationError('');
     
+    console.log('开始翻译，taskId:', taskId);
+    
     try {
       const response = await uploadService.getTaskTranslation(taskId, 'en');
+      
+      console.log('翻译API响应:', response);
       
       if (response.success && response.data) {
         setTranslationData(response);
         setDisplayMode('bilingual');
+        console.log('翻译成功，数据已回填');
       } else {
         setTranslationError(response.message || '翻译失败');
+        console.error('翻译失败，响应不成功:', response);
       }
     } catch (err) {
-      const error = err as { message?: string };
+      const error = err as { message?: string; code?: string };
       setTranslationError(error.message || '翻译失败，请稍后重试');
-      console.error('翻译失败:', err);
+      console.error('翻译请求异常:', err, 'code:', error.code);
     } finally {
       setIsTranslating(false);
     }
-  }, [taskId, isTranslating]);
+  }, [taskId, isTranslating, subtitleData]);
 
   const getTranslatedSegment = (index: number): TranslatedSegment | undefined => {
     return translationData?.data?.segments.find(seg => seg.index === index);
@@ -190,13 +202,15 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
               type="button"
               className="translate-btn"
               onClick={handleTranslate}
-              disabled={isTranslating}
+              disabled={isTranslating || !taskId}
             >
               {isTranslating ? (
                 <>
                   <span className="loading-spinner"></span>
                   翻译中...
                 </>
+              ) : !taskId ? (
+                '🌐 转换为英文 (不可用)'
               ) : (
                 '🌐 转换为英文'
               )}

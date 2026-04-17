@@ -142,10 +142,9 @@ export const uploadService = {
 
   async getTaskTranslation(taskId: string, targetLang: string = 'en'): Promise<TranslationResponse> {
     try {
-      const url = new URL(`${API_BASE_URL}/task/${taskId}/translate`);
-      url.searchParams.append('targetLang', targetLang);
+      const url = `${API_BASE_URL}/task/${taskId}/translate?targetLang=${encodeURIComponent(targetLang)}`;
       
-      const response = await fetch(url.toString());
+      const response = await fetch(url);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
