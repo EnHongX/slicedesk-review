@@ -139,7 +139,7 @@ const upload = multer({
 
 router.post('/upload', upload.single('audioFile'), (req: Request, res: Response) => {
   try {
-    const { programName, episodeNumber } = req.body;
+    const { programName, episodeNumber, sliceDurationSeconds } = req.body;
     const file = req.file;
 
     if (!file) {
@@ -169,7 +169,20 @@ router.post('/upload', upload.single('audioFile'), (req: Request, res: Response)
       return res.status(400).json(errorResponse);
     }
 
-    const task = createTask(programName.trim(), episodeNumber.trim());
+    const sliceDuration = sliceDurationSeconds 
+      ? parseFloat(sliceDurationSeconds) 
+      : DEFAULT_SLICE_DURATION_SECONDS;
+    
+    if (isNaN(sliceDuration) || sliceDuration <= 0) {
+      const errorResponse: ErrorResponse = {
+        success: false,
+        message: '切片时长必须是大于0的数字',
+        code: 'INVALID_SLICE_DURATION'
+      };
+      return res.status(400).json(errorResponse);
+    }
+
+    const task = createTask(programName.trim(), episodeNumber.trim(), sliceDuration);
     
     const audioFile = createAudioFile(
       task.id,
@@ -183,7 +196,7 @@ router.post('/upload', upload.single('audioFile'), (req: Request, res: Response)
     updateTaskStatus(task.id, 'processing');
 
     const estimatedDuration = estimateAudioDuration(file.size, file.mimetype);
-    const slices = calculateSlices(estimatedDuration, DEFAULT_SLICE_DURATION_SECONDS);
+    const slices = calculateSlices(estimatedDuration, sliceDuration);
     
     if (slices.length > 0) {
       createSlicesBulk(task.id, slices);
@@ -200,7 +213,8 @@ router.post('/upload', upload.single('audioFile'), (req: Request, res: Response)
         createdAt: task.createdAt,
         fileName: audioFile.originalName,
         programName: task.programName,
-        episodeNumber: task.episodeNumber
+        episodeNumber: task.episodeNumber,
+        sliceDurationSeconds: sliceDuration
       }
     };
 
@@ -274,7 +288,8 @@ router.get('/task/:taskId/slices', (req: Request, res: Response) => {
       taskId: taskId,
       slices: slices,
       totalDuration: totalDuration,
-      sliceCount: slices.length
+      sliceCount: slices.length,
+      sliceDurationSeconds: taskWithFile.sliceDurationSeconds
     }
   };
 

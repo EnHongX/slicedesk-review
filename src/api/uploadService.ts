@@ -4,7 +4,7 @@ const API_BASE_URL = '/api';
 
 export const uploadService = {
   async uploadAudio(formData: UploadFormData, onProgress?: (progress: number) => void): Promise<UploadResponse> {
-    const { audioFile, programName, episodeNumber } = formData;
+    const { audioFile, programName, episodeNumber, sliceDurationSeconds } = formData;
     
     if (!audioFile) {
       throw {
@@ -17,6 +17,7 @@ export const uploadService = {
     formDataObj.append('audioFile', audioFile);
     formDataObj.append('programName', programName);
     formDataObj.append('episodeNumber', episodeNumber);
+    formDataObj.append('sliceDurationSeconds', sliceDurationSeconds);
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -113,7 +114,7 @@ export const uploadService = {
   },
 
   async mockUpload(formData: UploadFormData, onProgress?: (progress: number) => void): Promise<UploadResponse> {
-    const { audioFile, programName, episodeNumber } = formData;
+    const { audioFile, programName, episodeNumber, sliceDurationSeconds } = formData;
     
     if (!audioFile) {
       throw {
@@ -147,7 +148,8 @@ export const uploadService = {
         createdAt: new Date().toISOString(),
         fileName: audioFile.name,
         programName,
-        episodeNumber
+        episodeNumber,
+        sliceDurationSeconds: parseFloat(sliceDurationSeconds) || 60
       }
     };
   }

@@ -2,12 +2,14 @@ export interface UploadFormData {
   audioFile: File | null;
   programName: string;
   episodeNumber: string;
+  sliceDurationSeconds: string;
 }
 
 export interface UploadFormErrors {
   audioFile?: string;
   programName?: string;
   episodeNumber?: string;
+  sliceDurationSeconds?: string;
 }
 
 export type UploadStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -35,6 +37,7 @@ export interface UploadResponse {
     fileName: string;
     programName: string;
     episodeNumber: string;
+    sliceDurationSeconds: number;
   };
 }
 
@@ -46,6 +49,7 @@ export interface SlicesResponse {
     slices: SliceInfo[];
     totalDuration: number;
     sliceCount: number;
+    sliceDurationSeconds: number;
   };
 }
 
