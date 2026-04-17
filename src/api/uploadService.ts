@@ -1,4 +1,4 @@
-import { UploadFormData, UploadResponse, UploadError } from '../types';
+import { UploadFormData, UploadResponse, UploadError, SlicesResponse } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -38,11 +38,12 @@ export const uploadService = {
               success: true,
               message: '上传成功',
               data: {
-                id: `upload_${Date.now()}`,
+                taskId: `upload_${Date.now()}`,
+                status: 'completed',
+                createdAt: new Date().toISOString(),
                 fileName: audioFile.name,
                 programName,
-                episodeNumber,
-                uploadTime: new Date().toISOString()
+                episodeNumber
               }
             });
           }
@@ -87,6 +88,30 @@ export const uploadService = {
     });
   },
 
+  async getTaskSlices(taskId: string): Promise<SlicesResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/task/${taskId}/slices`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw {
+          message: errorData.message || '获取切片列表失败',
+          code: `HTTP_${response.status}`
+        } as UploadError;
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw {
+          message: error.message,
+          code: 'NETWORK_ERROR'
+        } as UploadError;
+      }
+      throw error;
+    }
+  },
+
   async mockUpload(formData: UploadFormData, onProgress?: (progress: number) => void): Promise<UploadResponse> {
     const { audioFile, programName, episodeNumber } = formData;
     
@@ -117,11 +142,12 @@ export const uploadService = {
       success: true,
       message: '上传成功',
       data: {
-        id: `upload_${Date.now()}`,
+        taskId: `upload_${Date.now()}`,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
         fileName: audioFile.name,
         programName,
-        episodeNumber,
-        uploadTime: new Date().toISOString()
+        episodeNumber
       }
     };
   }

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { UploadFormData, UploadFormErrors, UploadStatus, UploadResponse, UploadError } from '../types';
+import { UploadFormData, UploadFormErrors, UploadStatus, UploadResponse, UploadError, SlicesResponse } from '../types';
 import { validationUtils, formatFileSize } from '../utils/validation';
 import { uploadService } from '../api/uploadService';
+import SliceList from './SliceList';
 
 const UploadForm: React.FC = () => {
   const [formData, setFormData] = useState<UploadFormData>({
@@ -17,6 +18,9 @@ const UploadForm: React.FC = () => {
   const [successResponse, setSuccessResponse] = useState<UploadResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [slicesData, setSlicesData] = useState<SlicesResponse | null>(null);
+  const [showSlices, setShowSlices] = useState<boolean>(false);
+  const [loadingSlices, setLoadingSlices] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,6 +110,20 @@ const UploadForm: React.FC = () => {
     }));
   };
 
+  const loadSlices = async (taskId: string) => {
+    setLoadingSlices(true);
+    try {
+      const response = await uploadService.getTaskSlices(taskId);
+      setSlicesData(response);
+      setShowSlices(true);
+    } catch (err) {
+      const error = err as UploadError;
+      console.error('获取切片列表失败:', error.message);
+    } finally {
+      setLoadingSlices(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -127,6 +145,8 @@ const UploadForm: React.FC = () => {
     setUploadProgress(0);
     setSuccessResponse(null);
     setErrorMessage('');
+    setSlicesData(null);
+    setShowSlices(false);
 
     try {
       const response = await uploadService.uploadAudio(formData, (progress) => {
@@ -135,6 +155,10 @@ const UploadForm: React.FC = () => {
 
       setUploadStatus('success');
       setSuccessResponse(response);
+
+      if (response.data?.taskId) {
+        await loadSlices(response.data.taskId);
+      }
     } catch (err) {
       const error = err as UploadError;
       setUploadStatus('error');
@@ -154,6 +178,8 @@ const UploadForm: React.FC = () => {
     setUploadProgress(0);
     setSuccessResponse(null);
     setErrorMessage('');
+    setSlicesData(null);
+    setShowSlices(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -276,7 +302,7 @@ const UploadForm: React.FC = () => {
           )}
         </button>
 
-        {uploadStatus === 'success' && successResponse && (
+        {uploadStatus === 'success' && successResponse && !showSlices && (
           <div className="status-message success">
             <span className="status-icon">✅</span>
             <div>
@@ -284,6 +310,7 @@ const UploadForm: React.FC = () => {
               <p>任务ID：{successResponse.data?.taskId}</p>
               <p>节目：{successResponse.data?.programName} | 第 {successResponse.data?.episodeNumber} 期</p>
               <p>当前状态：{successResponse.data?.status}</p>
+              {loadingSlices && <p className="loading-text">正在加载切片列表...</p>}
             </div>
             <button type="button" className="reset-btn" onClick={handleReset}>
               重置
@@ -304,6 +331,30 @@ const UploadForm: React.FC = () => {
           </div>
         )}
       </form>
+
+      {showSlices && slicesData && slicesData.data && (
+        <div className="slices-section">
+          <SliceList
+            slices={slicesData.data.slices}
+            totalDuration={slicesData.data.totalDuration}
+            sliceCount={slicesData.data.sliceCount}
+            taskInfo={
+              successResponse?.data
+                ? {
+                    programName: successResponse.data.programName,
+                    episodeNumber: successResponse.data.episodeNumber,
+                    fileName: successResponse.data.fileName
+                  }
+                : undefined
+            }
+          />
+          <div className="action-buttons">
+            <button type="button" className="reset-btn" onClick={handleReset}>
+              返回上传
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
