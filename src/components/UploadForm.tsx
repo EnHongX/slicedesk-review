@@ -10,11 +10,12 @@ import {
   Space,
   Typography,
   message,
-  Divider,
   Row,
   Col,
   Progress,
   Alert,
+  Tag,
+  Tooltip,
 } from 'antd';
 import {
   UploadOutlined,
@@ -25,6 +26,9 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   InboxOutlined,
+  InfoCircleOutlined,
+  SafetyOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { UploadFormData, UploadStatus, UploadResponse, UploadError, SlicesResponse, SubtitleResponse } from '../types';
 import { validationUtils, formatFileSize } from '../utils/validation';
@@ -260,10 +264,10 @@ const UploadForm: React.FC = () => {
         title={
           <Title level={3} style={{ margin: 0 }}>
             <AudioOutlined style={{ marginRight: '8px' }} />
-            播客音频上传
+            播客音频处理
           </Title>
         }
-        style={{ maxWidth: '800px', margin: '0 auto' }}
+        style={{ maxWidth: '1400px', margin: '0 auto' }}
       >
         <Form
           form={form}
@@ -274,224 +278,359 @@ const UploadForm: React.FC = () => {
             sliceDurationSeconds: 60,
           }}
         >
-          <Form.Item
-            name="audioFile"
-            label={
-              <Space>
-                <InboxOutlined />
-                <Text strong>音频文件</Text>
-              </Space>
-            }
-            rules={[
-              { required: true, message: '请选择音频文件' },
-            ]}
-            validateStatus={formData.audioFile ? 'success' : 'error'}
-            help={
-              formData.audioFile ? '' : '支持 MP3、WAV、OGG、M4A、AAC、FLAC 格式，最大 100MB'
-            }
-          >
-            <Dragger {...uploadProps}>
-              {formData.audioFile ? (
-                <div style={{ padding: '20px' }}>
-                  <AudioOutlined style={{ fontSize: '48px', color: '#52c41a' }} />
-                  <Paragraph style={{ marginTop: '16px', marginBottom: '8px', fontSize: '16px', fontWeight: '500' }}>
-                    {formData.audioFile.name}
-                  </Paragraph>
-                  <Text type="secondary">{formatFileSize(formData.audioFile.size)}</Text>
-                  <div style={{ marginTop: '12px' }}>
-                    <Button
-                      type="primary"
-                      icon={<ReloadOutlined />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleFileChange(null);
+          <Row gutter={[24, 24]}>
+            <Col span={16}>
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <InboxOutlined />
+                    <Text strong>上传音频文件</Text>
+                    <Tag color="red" style={{ marginLeft: '8px' }}>必填</Tag>
+                  </Space>
+                }
+                style={{ height: '100%' }}
+              >
+                <Form.Item
+                  name="audioFile"
+                  style={{ marginBottom: 0 }}
+                >
+                  <Dragger {...uploadProps}>
+                    {formData.audioFile ? (
+                      <div style={{ padding: '30px' }}>
+                        <AudioOutlined style={{ fontSize: '64px', color: '#52c41a' }} />
+                        <Paragraph style={{ marginTop: '20px', marginBottom: '8px', fontSize: '18px', fontWeight: '600' }}>
+                          {formData.audioFile.name}
+                        </Paragraph>
+                        <Text type="secondary" style={{ fontSize: '14px' }}>
+                          {formatFileSize(formData.audioFile.size)}
+                        </Text>
+                        <div style={{ marginTop: '16px' }}>
+                          <Button
+                            type="primary"
+                            icon={<ReloadOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFileChange(null);
+                            }}
+                            size="large"
+                          >
+                            更换文件
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '40px' }}>
+                        <p className="ant-upload-drag-icon">
+                          <InboxOutlined style={{ fontSize: '64px', color: '#1890ff' }} />
+                        </p>
+                        <p className="ant-upload-text" style={{ fontSize: '18px', fontWeight: '500', marginBottom: '8px' }}>
+                          点击或拖拽音频文件到此处
+                        </p>
+                        <p className="ant-upload-hint" style={{ fontSize: '14px' }}>
+                          <Space>
+                            <Tag color="blue">MP3</Tag>
+                            <Tag color="blue">WAV</Tag>
+                            <Tag color="blue">OGG</Tag>
+                            <Tag color="blue">M4A</Tag>
+                            <Tag color="blue">AAC</Tag>
+                            <Tag color="blue">FLAC</Tag>
+                            <Text type="secondary">最大 100MB</Text>
+                          </Space>
+                        </p>
+                      </div>
+                    )}
+                  </Dragger>
+                </Form.Item>
+              </Card>
+
+              {uploadStatus === 'loading' && (
+                <Card size="small" style={{ marginTop: '24px', background: '#e6f7ff' }}>
+                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                    <Space>
+                      <UploadOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
+                      <Text strong style={{ fontSize: '16px' }}>正在上传音频文件</Text>
+                      <Text type="secondary">{uploadProgress}%</Text>
+                    </Space>
+                    <Progress
+                      percent={uploadProgress}
+                      status="active"
+                      strokeColor={{
+                        '0%': '#1890ff',
+                        '100%': '#722ed1',
                       }}
-                    >
-                      更换文件
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ padding: '20px' }}>
-                  <p className="ant-upload-drag-icon">
-                    <InboxOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
-                  </p>
-                  <p className="ant-upload-text" style={{ fontSize: '16px' }}>
-                    点击或拖拽音频文件到此处
-                  </p>
-                  <p className="ant-upload-hint">
-                    支持 MP3、WAV、OGG、M4A、AAC、FLAC 格式，最大 100MB
-                  </p>
-                </div>
+                      strokeWidth={12}
+                    />
+                  </Space>
+                </Card>
               )}
-            </Dragger>
-          </Form.Item>
 
-          <Divider />
-
-          <Form.Item
-            name="taskType"
-            label={
-              <Space>
-                <ScissorOutlined />
-                <Text strong>处理方式</Text>
-              </Space>
-            }
-          >
-            <Radio.Group
-              value={formData.taskType}
-              onChange={handleTaskTypeChange}
-              style={{ width: '100%' }}
-            >
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Radio.Button
-                    value="slice"
-                    style={{
-                      width: '100%',
-                      height: '120px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '16px',
-                      borderRadius: '12px',
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <ScissorOutlined style={{ fontSize: '32px', color: formData.taskType === 'slice' ? '#1890ff' : '#999' }} />
-                      <div style={{ marginTop: '8px', fontSize: '16px', fontWeight: '600' }}>切片</div>
-                      <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
-                        将音频按指定时长切分成多个片段
-                      </div>
-                    </div>
-                  </Radio.Button>
-                </Col>
-                <Col span={12}>
-                  <Radio.Button
-                    value="subtitle"
-                    style={{
-                      width: '100%',
-                      height: '120px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '16px',
-                      borderRadius: '12px',
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <FileTextOutlined style={{ fontSize: '32px', color: formData.taskType === 'subtitle' ? '#1890ff' : '#999' }} />
-                      <div style={{ marginTop: '8px', fontSize: '16px', fontWeight: '600' }}>字幕生成</div>
-                      <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
-                        自动识别音频内容生成中文字幕
-                      </div>
-                    </div>
-                  </Radio.Button>
-                </Col>
-              </Row>
-            </Radio.Group>
-          </Form.Item>
-
-          <Divider />
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="programName"
-                label={
+              <Card
+                size="small"
+                title={
                   <Space>
-                    <Text strong>节目名称</Text>
+                    <InfoCircleOutlined />
+                    <Text strong>支持的音频格式</Text>
                   </Space>
                 }
-                rules={[
-                  { required: true, message: '请输入节目名称' },
-                ]}
+                style={{ marginTop: '24px' }}
               >
-                <Input
-                  placeholder="例如：科技前沿播客"
-                  size="large"
-                  value={formData.programName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, programName: e.target.value }))}
-                  disabled={uploadStatus === 'loading'}
-                />
-              </Form.Item>
+                <Row gutter={[16, 16]}>
+                  <Col span={6}>
+                    <Card size="small" style={{ textAlign: 'center', background: '#f0f5ff' }}>
+                      <AudioOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+                      <div style={{ marginTop: '8px', fontWeight: '600' }}>MP3</div>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>最常用格式</Text>
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}>
+                      <AudioOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
+                      <div style={{ marginTop: '8px', fontWeight: '600' }}>WAV</div>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>无损音质</Text>
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small" style={{ textAlign: 'center', background: '#fff7e6' }}>
+                      <AudioOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />
+                      <div style={{ marginTop: '8px', fontWeight: '600' }}>M4A</div>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>Apple 格式</Text>
+                    </Card>
+                  </Col>
+                  <Col span={6}>
+                    <Card size="small" style={{ textAlign: 'center', background: '#fff1f0' }}>
+                      <AudioOutlined style={{ fontSize: '24px', color: '#f5222d' }} />
+                      <div style={{ marginTop: '8px', fontWeight: '600' }}>FLAC</div>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>自由无损</Text>
+                    </Card>
+                  </Col>
+                </Row>
+              </Card>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="episodeNumber"
-                label={
+
+            <Col span={8}>
+              <Card
+                size="small"
+                title={
                   <Space>
-                    <Text strong>期数</Text>
+                    <ScissorOutlined />
+                    <Text strong>选择处理方式</Text>
                   </Space>
                 }
-                rules={[
-                  { required: true, message: '请输入期数' },
-                ]}
               >
-                <InputNumber
-                  placeholder="例如：1"
-                  min={1}
+                <Form.Item name="taskType" style={{ marginBottom: 0 }}>
+                  <Radio.Group
+                    value={formData.taskType}
+                    onChange={handleTaskTypeChange}
+                    style={{ width: '100%' }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                      <Radio.Button
+                        value="slice"
+                        style={{
+                          width: '100%',
+                          height: '100px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '16px',
+                          borderRadius: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '12px',
+                            background: formData.taskType === 'slice' ? 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)' : '#f0f0f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <ScissorOutlined style={{
+                              fontSize: '24px',
+                              color: formData.taskType === 'slice' ? 'white' : '#999',
+                            }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '16px', fontWeight: '600' }}>音频切片</div>
+                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                              将音频按指定时长切分成多个片段
+                            </Text>
+                          </div>
+                        </div>
+                      </Radio.Button>
+
+                      <Radio.Button
+                        value="subtitle"
+                        style={{
+                          width: '100%',
+                          height: '100px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '16px',
+                          borderRadius: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '12px',
+                            background: formData.taskType === 'subtitle' ? 'linear-gradient(135deg, #52c41a 0%, #13c2c2 100%)' : '#f0f0f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <FileTextOutlined style={{
+                              fontSize: '24px',
+                              color: formData.taskType === 'subtitle' ? 'white' : '#999',
+                            }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '16px', fontWeight: '600' }}>字幕生成</div>
+                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                              自动识别音频内容生成中文字幕
+                            </Text>
+                          </div>
+                        </div>
+                      </Radio.Button>
+                    </Space>
+                  </Radio.Group>
+                </Form.Item>
+              </Card>
+
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <InfoCircleOutlined />
+                    <Text strong>节目信息</Text>
+                  </Space>
+                }
+                style={{ marginTop: '24px' }}
+              >
+                <Form.Item
+                  name="programName"
+                  label={<Text strong>节目名称</Text>}
+                  rules={[
+                    { required: true, message: '请输入节目名称' },
+                  ]}
+                >
+                  <Input
+                    placeholder="例如：科技前沿播客"
+                    size="large"
+                    value={formData.programName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, programName: e.target.value }))}
+                    disabled={uploadStatus === 'loading'}
+                    prefix={<Tag color="purple">节目</Tag>}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="episodeNumber"
+                  label={<Text strong>期数</Text>}
+                  rules={[
+                    { required: true, message: '请输入期数' },
+                  ]}
+                >
+                  <InputNumber
+                    placeholder="例如：1"
+                    min={1}
+                    size="large"
+                    style={{ width: '100%' }}
+                    value={formData.episodeNumber ? parseInt(formData.episodeNumber) : undefined}
+                    onChange={(value) => setFormData(prev => ({ ...prev, episodeNumber: value?.toString() || '' }))}
+                    disabled={uploadStatus === 'loading'}
+                    addonBefore={<Tag color="magenta">期</Tag>}
+                  />
+                </Form.Item>
+
+                {formData.taskType === 'slice' && (
+                  <Form.Item
+                    name="sliceDurationSeconds"
+                    label={
+                      <Space>
+                        <Text strong>切片时长</Text>
+                        <Tooltip title="每段音频的时长，单位：秒">
+                          <InfoCircleOutlined style={{ color: '#999' }} />
+                        </Tooltip>
+                      </Space>
+                    }
+                    rules={[
+                      { required: true, message: '请输入切片时长' },
+                    ]}
+                  >
+                    <InputNumber
+                      placeholder="例如：60"
+                      min={1}
+                      max={3600}
+                      size="large"
+                      style={{ width: '100%' }}
+                      addonAfter="秒"
+                      value={formData.sliceDurationSeconds ? parseInt(formData.sliceDurationSeconds) : 60}
+                      onChange={(value) => setFormData(prev => ({ ...prev, sliceDurationSeconds: value?.toString() || '60' }))}
+                      disabled={uploadStatus === 'loading'}
+                    />
+                  </Form.Item>
+                )}
+              </Card>
+
+              <Card
+                size="small"
+                style={{ marginTop: '24px', background: 'linear-gradient(135deg, #f0f5ff 0%, #faf5ff 100%)' }}
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                      <Space>
+                        <ThunderboltOutlined style={{ color: '#1890ff' }} />
+                        <Text strong>快速处理</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        平均处理时间 30 秒
+                      </Text>
+                    </Space>
+                  </Col>
+                  <Col span={12}>
+                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                      <Space>
+                        <SafetyOutlined style={{ color: '#52c41a' }} />
+                        <Text strong>安全可靠</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        数据加密传输存储
+                      </Text>
+                    </Space>
+                  </Col>
+                </Row>
+              </Card>
+
+              <Form.Item style={{ marginTop: '24px', marginBottom: 0 }}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
                   size="large"
-                  style={{ width: '100%' }}
-                  value={formData.episodeNumber ? parseInt(formData.episodeNumber) : undefined}
-                  onChange={(value) => setFormData(prev => ({ ...prev, episodeNumber: value?.toString() || '' }))}
-                  disabled={uploadStatus === 'loading'}
-                />
+                  loading={uploadStatus === 'loading'}
+                  style={{
+                    width: '100%',
+                    height: '52px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
+                    border: 'none',
+                  }}
+                  icon={<UploadOutlined />}
+                >
+                  {uploadStatus === 'loading'
+                    ? `上传中 (${uploadProgress}%)`
+                    : uploadStatus === 'success'
+                    ? '重新上传'
+                    : '开始处理'
+                  }
+                </Button>
               </Form.Item>
             </Col>
           </Row>
-
-          {formData.taskType === 'slice' && (
-            <>
-              <Divider />
-              <Form.Item
-                name="sliceDurationSeconds"
-                label={
-                  <Space>
-                    <Text strong>切片时长（秒）</Text>
-                  </Space>
-                }
-                rules={[
-                  { required: true, message: '请输入切片时长' },
-                ]}
-              >
-                <InputNumber
-                  placeholder="例如：60"
-                  min={1}
-                  max={3600}
-                  size="large"
-                  style={{ width: '100%' }}
-                  addonAfter="秒"
-                  value={formData.sliceDurationSeconds ? parseInt(formData.sliceDurationSeconds) : 60}
-                  onChange={(value) => setFormData(prev => ({ ...prev, sliceDurationSeconds: value?.toString() || '60' }))}
-                  disabled={uploadStatus === 'loading'}
-                />
-              </Form.Item>
-            </>
-          )}
-
-          <Divider />
-
-          {uploadStatus === 'loading' && (
-            <Alert
-              message={
-              <Space>
-                <span>上传进度</span>
-                <Text type="secondary">{uploadProgress}%</Text>
-              </Space>
-            }
-              description={
-              <Progress
-                percent={uploadProgress}
-                status="active"
-                showInfo={false}
-              />
-            }
-              type="info"
-              showIcon
-              style={{ marginBottom: '16px' }}
-            />
-          )}
 
           {uploadStatus === 'success' && successResponse && !showSlices && !showSubtitles && (
             <Alert
@@ -507,7 +646,7 @@ const UploadForm: React.FC = () => {
               type="success"
               showIcon
               icon={<CheckCircleOutlined />}
-              style={{ marginBottom: '16px' }}
+              style={{ marginTop: '24px' }}
             />
           )}
 
@@ -518,27 +657,9 @@ const UploadForm: React.FC = () => {
               type="error"
               showIcon
               icon={<CloseCircleOutlined />}
-              style={{ marginBottom: '16px' }}
+              style={{ marginTop: '24px' }}
             />
           )}
-
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
-              loading={uploadStatus === 'loading'}
-              style={{ width: '100%', height: '48px', fontSize: '16px' }}
-              icon={<UploadOutlined />}
-            >
-              {uploadStatus === 'loading'
-                ? `上传中 (${uploadProgress}%)`
-                : uploadStatus === 'success'
-                ? '重新上传'
-                : '提交上传'
-              }
-            </Button>
-          </Form.Item>
         </Form>
       </Card>
     </>
