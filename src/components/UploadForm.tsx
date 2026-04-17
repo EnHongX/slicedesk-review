@@ -16,6 +16,7 @@ import {
   Alert,
   Tag,
   Tooltip,
+  Collapse,
 } from 'antd';
 import {
   UploadOutlined,
@@ -364,48 +365,6 @@ const UploadForm: React.FC = () => {
                   </Space>
                 </Card>
               )}
-
-              <Card
-                size="small"
-                title={
-                  <Space>
-                    <InfoCircleOutlined />
-                    <Text strong>支持的音频格式</Text>
-                  </Space>
-                }
-                style={{ marginTop: '24px' }}
-              >
-                <Row gutter={[16, 16]}>
-                  <Col span={6}>
-                    <Card size="small" style={{ textAlign: 'center', background: '#f0f5ff' }}>
-                      <AudioOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-                      <div style={{ marginTop: '8px', fontWeight: '600' }}>MP3</div>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>最常用格式</Text>
-                    </Card>
-                  </Col>
-                  <Col span={6}>
-                    <Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}>
-                      <AudioOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
-                      <div style={{ marginTop: '8px', fontWeight: '600' }}>WAV</div>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>无损音质</Text>
-                    </Card>
-                  </Col>
-                  <Col span={6}>
-                    <Card size="small" style={{ textAlign: 'center', background: '#fff7e6' }}>
-                      <AudioOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />
-                      <div style={{ marginTop: '8px', fontWeight: '600' }}>M4A</div>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Apple 格式</Text>
-                    </Card>
-                  </Col>
-                  <Col span={6}>
-                    <Card size="small" style={{ textAlign: 'center', background: '#fff1f0' }}>
-                      <AudioOutlined style={{ fontSize: '24px', color: '#f5222d' }} />
-                      <div style={{ marginTop: '8px', fontWeight: '600' }}>FLAC</div>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>自由无损</Text>
-                    </Card>
-                  </Col>
-                </Row>
-              </Card>
             </Col>
 
             <Col span={8}>
@@ -604,6 +563,67 @@ const UploadForm: React.FC = () => {
                   </Col>
                 </Row>
               </Card>
+
+              <Collapse
+                defaultActiveKey={[]}
+                style={{ marginTop: '24px' }}
+                size="small"
+              >
+                <Collapse.Panel
+                  header={
+                    <Space>
+                      <InfoCircleOutlined />
+                      <Text strong>支持的音频格式</Text>
+                    </Space>
+                  }
+                  key="audio-formats"
+                >
+                  <Row gutter={[16, 16]}>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#f0f5ff' }}>
+                        <AudioOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
+                        <div style={{ marginTop: '4px', fontWeight: '600', fontSize: '14px' }}>MP3</div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>最常用格式</Text>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}>
+                        <AudioOutlined style={{ fontSize: '20px', color: '#52c41a' }} />
+                        <div style={{ marginTop: '4px', fontWeight: '600', fontSize: '14px' }}>WAV</div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>无损音质</Text>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#f9f0ff' }}>
+                        <AudioOutlined style={{ fontSize: '20px', color: '#722ed1' }} />
+                        <div style={{ marginTop: '4px', fontWeight: '600', fontSize: '14px' }}>OGG</div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>开源格式</Text>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#fff7e6' }}>
+                        <AudioOutlined style={{ fontSize: '20px', color: '#fa8c16' }} />
+                        <div style={{ marginTop: '4px', fontWeight: '600', fontSize: '14px' }}>M4A</div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>Apple 格式</Text>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#e6fffb' }}>
+                        <AudioOutlined style={{ fontSize: '20px', color: '#13c2c2' }} />
+                        <div style={{ marginTop: '4px', fontWeight: '600', fontSize: '14px' }}>AAC</div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>高效压缩</Text>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#fff1f0' }}>
+                        <AudioOutlined style={{ fontSize: '20px', color: '#f5222d' }} />
+                        <div style={{ marginTop: '4px', fontWeight: '600', fontSize: '14px' }}>FLAC</div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>自由无损</Text>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Collapse.Panel>
+              </Collapse>
 
               <Form.Item style={{ marginTop: '24px', marginBottom: 0 }}>
                 <Button
