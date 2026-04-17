@@ -256,8 +256,10 @@ const UploadForm: React.FC = () => {
 
   const isLoadingResults = loadingSlices || loadingSubtitles;
 
+  const showResults = showSlices || showSubtitles;
+
   return (
-    <div className="container">
+    <div className={`container ${!showResults ? 'narrow' : ''}`}>
       <h1>播客音频上传</h1>
       
       <form onSubmit={handleSubmit}>

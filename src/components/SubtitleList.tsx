@@ -1,7 +1,35 @@
 import React, { useState, useCallback } from 'react';
+import {
+  Card,
+  Tabs,
+  Button,
+  Table,
+  Space,
+  Tag,
+  Alert,
+  Row,
+  Col,
+  Typography,
+  message,
+  Divider,
+  Radio,
+  RadioChangeEvent,
+} from 'antd';
+import {
+  DownloadOutlined,
+  CopyOutlined,
+  TranslationOutlined,
+  GlobalOutlined,
+  CheckCircleOutlined,
+  FileTextOutlined,
+  ScheduleOutlined,
+  NumberOutlined,
+} from '@ant-design/icons';
 import { SubtitleSegment, SubtitleResponse, TranslatedSegment, TranslationResponse } from '../types';
 import { convertToSRT, downloadSRT } from '../utils/subtitleUtils';
 import { uploadService } from '../api/uploadService';
+
+const { Title, Text, Paragraph } = Typography;
 
 interface SubtitleListProps {
   subtitleData: SubtitleResponse;
@@ -31,10 +59,7 @@ function formatDuration(seconds: number): string {
 }
 
 const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) => {
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [exportSuccess, setExportSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'segments' | 'fulltext'>('fulltext');
-  
+  const [messageApi, contextHolder] = message.useMessage();
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationData, setTranslationData] = useState<TranslationResponse | null>(null);
   const [translationError, setTranslationError] = useState<string>('');
@@ -80,32 +105,32 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
       
       const srtContent = convertToSRT(exportSegments);
       downloadSRT(srtContent, fileName);
-      setExportSuccess(true);
-      setTimeout(() => setExportSuccess(false), 2000);
+      messageApi.success(`已导出 ${isEnglish ? '英文' : '中文'} 字幕文件`);
     } catch (err) {
       console.error('导出失败:', err);
+      messageApi.error('导出失败，请重试');
     }
-  }, [segments, translationData, generateFileName]);
+  }, [segments, translationData, generateFileName, messageApi]);
 
   const handleCopyFullText = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      messageApi.success('已复制到剪贴板');
     } catch (err) {
       console.error('复制失败:', err);
+      messageApi.error('复制失败，请重试');
     }
-  }, []);
+  }, [messageApi]);
 
   const handleCopySegment = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      messageApi.success('已复制到剪贴板');
     } catch (err) {
       console.error('复制失败:', err);
+      messageApi.error('复制失败，请重试');
     }
-  }, []);
+  }, [messageApi]);
 
   const handleTranslate = useCallback(async () => {
     if (isTranslating) return;
@@ -129,6 +154,7 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
       if (response.success && response.data) {
         setTranslationData(response);
         setDisplayMode('bilingual');
+        messageApi.success('翻译完成！');
         console.log('翻译成功，数据已回填');
       } else {
         setTranslationError(response.message || '翻译失败');
@@ -141,7 +167,7 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
     } finally {
       setIsTranslating(false);
     }
-  }, [taskId, isTranslating, subtitleData]);
+  }, [taskId, isTranslating, subtitleData, messageApi]);
 
   const getTranslatedSegment = (index: number): TranslatedSegment | undefined => {
     return translationData?.data?.segments.find(seg => seg.index === index);
@@ -158,265 +184,407 @@ const SubtitleList: React.FC<SubtitleListProps> = ({ subtitleData, taskInfo }) =
     }
   };
 
+  const handleDisplayModeChange = (e: RadioChangeEvent) => {
+    setDisplayMode(e.target.value as DisplayMode);
+  };
+
+  const tableColumns = [
+    {
+      title: '序号',
+      dataIndex: 'index',
+      key: 'index',
+      width: 80,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => (
+        <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
+          {index + 1}
+        </Tag>
+      ),
+    },
+    {
+      title: '开始时间',
+      dataIndex: 'startTime',
+      key: 'startTime',
+      width: 140,
+      render: (time: number) => formatTime(time),
+    },
+    {
+      title: '结束时间',
+      dataIndex: 'endTime',
+      key: 'endTime',
+      width: 140,
+      render: (time: number) => formatTime(time),
+    },
+    ...(displayMode === 'bilingual'
+      ? [
+          {
+            title: '中文原文',
+            dataIndex: 'text',
+            key: 'text',
+            render: (text: string) => (
+              <Text style={{ fontSize: '14px', lineHeight: '1.6' }}>{text}</Text>
+            ),
+          },
+          {
+            title: '英文译文',
+            key: 'translatedText',
+            render: (_: unknown, record: SubtitleSegment & { translatedText?: string }) => {
+              const translatedSeg = getTranslatedSegment(record.index);
+              return (
+                <Text type="secondary" style={{ fontSize: '14px', lineHeight: '1.6', fontStyle: 'italic' }}>
+                  {translatedSeg?.translatedText || '-'}
+                </Text>
+              );
+            },
+          },
+        ]
+      : [
+          {
+            title: displayMode === 'translated' ? '英文译文' : '字幕内容',
+            key: 'displayText',
+            render: (_: unknown, record: SubtitleSegment) => {
+              const translatedSeg = getTranslatedSegment(record.index);
+              const displayText =
+                displayMode === 'translated' && translatedSeg
+                  ? translatedSeg.translatedText
+                  : record.text;
+              return <Text style={{ fontSize: '14px', lineHeight: '1.6' }}>{displayText}</Text>;
+            },
+          },
+        ]),
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      align: 'center' as const,
+      render: (_: unknown, record: SubtitleSegment) => {
+        const translatedSeg = getTranslatedSegment(record.index);
+        const textToCopy =
+          displayMode === 'translated' && translatedSeg
+            ? translatedSeg.translatedText
+            : record.text;
+        return (
+          <Button
+            type="text"
+            icon={<CopyOutlined />}
+            onClick={() => handleCopySegment(textToCopy)}
+            size="small"
+          >
+            复制
+          </Button>
+        );
+      },
+    },
+  ];
+
   if (segments.length === 0 && !fullText) {
     return (
-      <div className="subtitle-list-container">
-        <div className="subtitle-list-empty">
-          <p>暂无字幕数据</p>
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <Text type="secondary">暂无字幕数据</Text>
         </div>
-      </div>
+      </Card>
     );
   }
 
-  return (
-    <div className="subtitle-list-container">
-      <div className="subtitle-list-header">
-        <h2>字幕生成结果</h2>
-        {taskInfo && (
-          <div className="task-info">
-            <span className="task-info-item">
-              <strong>节目：</strong>{taskInfo.programName}
-            </span>
-            <span className="task-info-item">
-              <strong>期数：</strong>第 {taskInfo.episodeNumber} 期
-            </span>
-            <span className="task-info-item">
-              <strong>文件：</strong>{taskInfo.fileName}
-            </span>
-          </div>
-        )}
-        <div className="subtitle-summary">
-          <span className="summary-item">
-            <strong>片段数量：</strong>{segmentCount} 段
-          </span>
-          <span className="summary-item">
-            <strong>总时长：</strong>{formatDuration(totalDuration)}
-          </span>
-          <span className="summary-item">
-            <strong>语言：</strong>{getDisplayLanguageLabel()}
-          </span>
-        </div>
-        <div className="subtitle-actions">
-          {!translationData ? (
-            <button
-              type="button"
-              className="translate-btn"
-              onClick={handleTranslate}
-              disabled={isTranslating || !taskId}
-            >
-              {isTranslating ? (
-                <>
-                  <span className="loading-spinner"></span>
-                  翻译中...
-                </>
-              ) : !taskId ? (
-                '🌐 转换为英文 (不可用)'
-              ) : (
-                '🌐 转换为英文'
-              )}
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className={`language-toggle-btn ${displayMode === 'original' ? 'active' : ''}`}
-                onClick={() => setDisplayMode('original')}
-              >
-                中文
-              </button>
-              <button
-                type="button"
-                className={`language-toggle-btn ${displayMode === 'translated' ? 'active' : ''}`}
-                onClick={() => setDisplayMode('translated')}
-              >
-                英文
-              </button>
-              <button
-                type="button"
-                className={`language-toggle-btn ${displayMode === 'bilingual' ? 'active' : ''}`}
-                onClick={() => setDisplayMode('bilingual')}
-              >
-                双语对照
-              </button>
-            </>
-          )}
-          {translationData && (
-            <button
-              type="button"
-              className="export-btn export-btn-secondary"
-              onClick={() => handleExportSRT(true)}
-            >
-              {exportSuccess ? '✓ 已导出' : '📥 导出英文 SRT'}
-            </button>
-          )}
-          <button
-            type="button"
-            className="export-btn"
-            onClick={() => handleExportSRT(false)}
-          >
-            {exportSuccess ? '✓ 已导出' : '📥 导出 SRT'}
-          </button>
-        </div>
-      </div>
-
-      {translationError && (
-        <div className="translation-error">
-          <span className="status-icon">⚠️</span>
-          {translationError}
-        </div>
-      )}
-
-      <div className="subtitle-tabs">
-        <button
-          type="button"
-          className={`tab-btn ${activeTab === 'fulltext' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fulltext')}
-        >
-          完整文本
-        </button>
-        <button
-          type="button"
-          className={`tab-btn ${activeTab === 'segments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('segments')}
-        >
-          分段字幕
-        </button>
-      </div>
-
-      {activeTab === 'fulltext' && (
-        <div className="fulltext-section">
+  const tabItems = [
+    {
+      key: 'fulltext',
+      label: (
+        <span>
+          <FileTextOutlined /> 完整文本
+        </span>
+      ),
+      children: (
+        <Card size="small">
           {displayMode === 'bilingual' && translationData?.data ? (
-            <div className="bilingual-fulltext">
-              <div className="fulltext-column">
-                <div className="fulltext-header">
-                  <h3>中文原文</h3>
-                  <button
-                    type="button"
-                    className="copy-btn"
-                    onClick={() => handleCopyFullText(fullText)}
-                  >
-                    {copySuccess ? '✓ 已复制' : '📋 一键复制'}
-                  </button>
-                </div>
-                <div className="fulltext-content">
-                  <pre>{fullText}</pre>
-                </div>
-              </div>
-              <div className="fulltext-column">
-                <div className="fulltext-header">
-                  <h3>英文译文</h3>
-                  <button
-                    type="button"
-                    className="copy-btn"
-                    onClick={() => handleCopyFullText(translationData.data!.fullTranslatedText)}
-                  >
-                    {copySuccess ? '✓ 已复制' : '📋 一键复制'}
-                  </button>
-                </div>
-                <div className="fulltext-content">
-                  <pre>{translationData.data.fullTranslatedText}</pre>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="fulltext-header">
-                <h3>
-                  {displayMode === 'translated' ? '完整英文文本' : '完整字幕文本'}
-                </h3>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => handleCopyFullText(
-                    displayMode === 'translated' && translationData?.data
-                      ? translationData.data.fullTranslatedText
-                      : fullText
-                  )}
+            <Row gutter={24}>
+              <Col span={12}>
+                <Card
+                  size="small"
+                  title={
+                    <Space>
+                      <GlobalOutlined />
+                      <span>中文原文</span>
+                    </Space>
+                  }
+                  extra={
+                    <Button
+                      type="primary"
+                      ghost
+                      icon={<CopyOutlined />}
+                      onClick={() => handleCopyFullText(fullText)}
+                      size="small"
+                    >
+                      一键复制
+                    </Button>
+                  }
                 >
-                  {copySuccess ? '✓ 已复制' : '📋 一键复制'}
-                </button>
-              </div>
-              <div className="fulltext-content">
-                <pre>
-                  {displayMode === 'translated' && translationData?.data
-                    ? translationData.data.fullTranslatedText
-                    : fullText}
-                </pre>
-              </div>
-            </>
+                  <Paragraph
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      fontSize: '15px',
+                      lineHeight: '1.8',
+                      margin: 0,
+                    }}
+                  >
+                    {fullText}
+                  </Paragraph>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card
+                  size="small"
+                  title={
+                    <Space>
+                      <TranslationOutlined />
+                      <span>英文译文</span>
+                    </Space>
+                  }
+                  extra={
+                    <Button
+                      type="primary"
+                      ghost
+                      icon={<CopyOutlined />}
+                      onClick={() => handleCopyFullText(translationData.data!.fullTranslatedText)}
+                      size="small"
+                    >
+                      一键复制
+                    </Button>
+                  }
+                >
+                  <Paragraph
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      fontSize: '15px',
+                      lineHeight: '1.8',
+                      margin: 0,
+                      fontStyle: 'italic',
+                    }}
+                    type="secondary"
+                  >
+                    {translationData.data.fullTranslatedText}
+                  </Paragraph>
+                </Card>
+              </Col>
+            </Row>
+          ) : (
+            <Card
+              size="small"
+              title={
+                <Space>
+                  <FileTextOutlined />
+                  <span>
+                    {displayMode === 'translated' ? '完整英文文本' : '完整字幕文本'}
+                  </span>
+                </Space>
+              }
+              extra={
+                <Button
+                  type="primary"
+                  ghost
+                  icon={<CopyOutlined />}
+                  onClick={() =>
+                    handleCopyFullText(
+                      displayMode === 'translated' && translationData?.data
+                        ? translationData.data.fullTranslatedText
+                        : fullText
+                    )
+                  }
+                  size="small"
+                >
+                  一键复制
+                </Button>
+              }
+            >
+              <Paragraph
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  fontSize: '15px',
+                  lineHeight: '1.8',
+                  margin: 0,
+                }}
+              >
+                {displayMode === 'translated' && translationData?.data
+                  ? translationData.data.fullTranslatedText
+                  : fullText}
+              </Paragraph>
+            </Card>
           )}
-        </div>
-      )}
+        </Card>
+      ),
+    },
+    {
+      key: 'segments',
+      label: (
+        <span>
+          <ScheduleOutlined /> 分段字幕
+        </span>
+      ),
+      children: (
+        <Card size="small">
+          <Table
+            columns={tableColumns}
+            dataSource={segments}
+            rowKey="index"
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 段字幕`,
+              pageSizeOptions: ['10', '20', '50', '100'],
+            }}
+            scroll={{ x: 800 }}
+          />
+        </Card>
+      ),
+    },
+  ];
 
-      {activeTab === 'segments' && (
-        <div className="segments-section">
-          <div className="segments-table-container">
-            <table className="segments-table">
-              <thead>
-                <tr>
-                  <th className="col-index">序号</th>
-                  <th className="col-time">开始时间</th>
-                  <th className="col-time">结束时间</th>
-                  {displayMode === 'bilingual' ? (
-                    <>
-                      <th className="col-text">中文原文</th>
-                      <th className="col-text">英文译文</th>
-                    </>
-                  ) : (
-                    <th className="col-text">
-                      {displayMode === 'translated' ? '英文译文' : '字幕内容'}
-                    </th>
-                  )}
-                  <th className="col-action">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {segments.map((segment: SubtitleSegment) => {
-                  const translatedSeg = getTranslatedSegment(segment.index);
-                  return (
-                    <tr key={segment.index} className="segment-row">
-                      <td className="col-index">
-                        <span className="segment-badge">{segment.index + 1}</span>
-                      </td>
-                      <td className="col-time">{formatTime(segment.startTime)}</td>
-                      <td className="col-time">{formatTime(segment.endTime)}</td>
-                      {displayMode === 'bilingual' ? (
-                        <>
-                          <td className="col-text">{segment.text}</td>
-                          <td className="col-text translated-text">
-                            {translatedSeg?.translatedText || '-'}
-                          </td>
-                        </>
-                      ) : (
-                        <td className="col-text">
-                          {displayMode === 'translated'
-                            ? translatedSeg?.translatedText || segment.text
-                            : segment.text}
-                        </td>
-                      )}
-                      <td className="col-action">
-                        <button
-                          type="button"
-                          className="copy-segment-btn"
-                          onClick={() => {
-                            const textToCopy = displayMode === 'translated' && translatedSeg
-                              ? translatedSeg.translatedText
-                              : segment.text;
-                            handleCopySegment(textToCopy);
-                          }}
-                        >
-                          复制
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
+  return (
+    <>
+      {contextHolder}
+      <Card
+        title={
+          <Title level={3} style={{ margin: 0 }}>
+            <FileTextOutlined style={{ marginRight: '8px' }} />
+            字幕生成结果
+          </Title>
+        }
+        extra={
+          <Space>
+            {translationData && (
+              <Radio.Group value={displayMode} onChange={handleDisplayModeChange} buttonStyle="solid">
+                <Radio.Button value="original">
+                  <GlobalOutlined /> 中文
+                </Radio.Button>
+                <Radio.Button value="translated">
+                  <TranslationOutlined /> 英文
+                </Radio.Button>
+                <Radio.Button value="bilingual">
+                  <CheckCircleOutlined /> 双语对照
+                </Radio.Button>
+              </Radio.Group>
+            )}
+          </Space>
+        }
+      >
+        {taskInfo && (
+          <>
+            <Row gutter={[16, 8]} style={{ marginBottom: '16px' }}>
+              <Col span={8}>
+                <Space>
+                  <Text strong>节目：</Text>
+                  <Tag color="purple">{taskInfo.programName}</Tag>
+                </Space>
+              </Col>
+              <Col span={8}>
+                <Space>
+                  <Text strong>期数：</Text>
+                  <Tag color="magenta">第 {taskInfo.episodeNumber} 期</Tag>
+                </Space>
+              </Col>
+              <Col span={8}>
+                <Space>
+                  <Text strong>文件：</Text>
+                  <Text ellipsis style={{ maxWidth: '200px' }}>
+                    {taskInfo.fileName}
+                  </Text>
+                </Space>
+              </Col>
+            </Row>
+            <Divider style={{ margin: '12px 0' }} />
+          </>
+        )}
+
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col span={6}>
+            <Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}>
+              <NumberOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
+              <div style={{ marginTop: '8px' }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>片段数量</Text>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#52c41a' }}>
+                  {segmentCount} 段
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small" style={{ textAlign: 'center', background: '#e6f7ff' }}>
+              <ScheduleOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+              <div style={{ marginTop: '8px' }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>总时长</Text>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1890ff' }}>
+                  {formatDuration(totalDuration)}
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small" style={{ textAlign: 'center', background: '#fff7e6' }}>
+              <GlobalOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />
+              <div style={{ marginTop: '8px' }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>当前语言</Text>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fa8c16' }}>
+                  {getDisplayLanguageLabel()}
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                {!translationData ? (
+                  <Button
+                    type="primary"
+                    icon={<TranslationOutlined />}
+                    onClick={handleTranslate}
+                    loading={isTranslating}
+                    disabled={!taskId}
+                    style={{ width: '100%' }}
+                    size="large"
+                  >
+                    {isTranslating ? '翻译中...' : '转换为英文'}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="primary"
+                      icon={<DownloadOutlined />}
+                      onClick={() => handleExportSRT(true)}
+                      style={{ width: '100%' }}
+                    >
+                      导出英文 SRT
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => handleExportSRT(false)}
+                      style={{ width: '100%' }}
+                    >
+                      导出中文 SRT
+                    </Button>
+                  </>
+                )}
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+        {translationError && (
+          <Alert
+            message="翻译失败"
+            description={translationError}
+            type="error"
+            showIcon
+            style={{ marginBottom: '16px' }}
+          />
+        )}
+
+        <Tabs defaultActiveKey="fulltext" items={tabItems} />
+      </Card>
+    </>
   );
 };
 

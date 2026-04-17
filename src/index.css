@@ -24,11 +24,15 @@ body {
 
 .container {
   width: 100%;
-  max-width: 600px;
+  max-width: 1400px;
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   padding: 40px;
+}
+
+.container.narrow {
+  max-width: 600px;
 }
 
 h1 {
