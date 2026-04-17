@@ -129,7 +129,7 @@ const UploadForm: React.FC = () => {
     setErrorMessage('');
 
     try {
-      const response = await uploadService.mockUpload(formData, (progress) => {
+      const response = await uploadService.uploadAudio(formData, (progress) => {
         setUploadProgress(progress);
       });
 
@@ -281,7 +281,9 @@ const UploadForm: React.FC = () => {
             <span className="status-icon">✅</span>
             <div>
               <strong>上传成功！</strong>
+              <p>任务ID：{successResponse.data?.taskId}</p>
               <p>节目：{successResponse.data?.programName} | 第 {successResponse.data?.episodeNumber} 期</p>
+              <p>当前状态：{successResponse.data?.status}</p>
             </div>
             <button type="button" className="reset-btn" onClick={handleReset}>
               重置
