@@ -11,6 +11,23 @@ const DB_PATH = path.join(__dirname, '../../data/app.db');
 
 let db: Database.Database;
 
+function migrateDatabase(): void {
+  try {
+    db.exec(`
+      ALTER TABLE tasks ADD COLUMN slice_duration_seconds REAL DEFAULT 60 NOT NULL;
+    `);
+    console.log('Migrating database: adding slice_duration_seconds column to tasks table...');
+    console.log('Database migration completed successfully.');
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('duplicate column name')) {
+      // Column already exists, no action needed
+    } else {
+      console.error('Database migration failed:', error);
+      throw error;
+    }
+  }
+}
+
 export function initDatabase(): void {
   db = new Database(DB_PATH);
   
@@ -55,6 +72,8 @@ export function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_slices_task_id ON slices(task_id);
     CREATE INDEX IF NOT EXISTS idx_slices_task_index ON slices(task_id, slice_index);
   `);
+
+  migrateDatabase();
 
   console.log(`Database initialized at: ${DB_PATH}`);
 }
