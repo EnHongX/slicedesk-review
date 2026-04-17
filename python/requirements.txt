@@ -1,1 +1,4 @@
 pydub>=0.25.1
+funasr>=1.0.0
+modelscope>=1.0.0
+torch>=2.0.0
