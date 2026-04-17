@@ -20,7 +20,9 @@ import {
   SliceInfo, 
   TaskType,
   SubtitleResponse,
-  SubtitleSegment
+  SubtitleSegment,
+  TranslationResponse,
+  TranslatedSegment
 } from '../types.js';
 import fs from 'fs';
 
@@ -152,6 +154,25 @@ function generateMockSubtitles(totalDurationSeconds: number): { segments: Subtit
     segments,
     fullText: fullTextParts.join('')
   };
+}
+
+const CHINESE_TO_ENGLISH_DICTIONARY: Record<string, string> = {
+  "欢迎收听今天的节目": "Welcome to today's program",
+  "我们今天要讨论的话题非常有趣": "The topic we're discussing today is very interesting",
+  "首先让我们来看一下最新的数据": "First, let's look at the latest data",
+  "这些数据显示了一些重要的趋势": "These data show some important trends",
+  "接下来我想分享一些个人的见解": "Next, I'd like to share some personal insights",
+  "希望大家能够从中获得一些启发": "I hope everyone can gain some inspiration from it",
+  "如果有任何问题欢迎随时提问": "If you have any questions, please feel free to ask",
+  "感谢大家的收听我们下期再见": "Thank you for listening, see you next time"
+};
+
+function translateText(text: string): string {
+  if (CHINESE_TO_ENGLISH_DICTIONARY[text]) {
+    return CHINESE_TO_ENGLISH_DICTIONARY[text];
+  }
+  
+  return `[Translated] ${text}`;
 }
 
 const storage = multer.diskStorage({
@@ -403,6 +424,65 @@ router.get('/task/:taskId/subtitles', (req: Request, res: Response) => {
       language: 'zh',
       fullText: fullText,
       segments: segments
+    }
+  };
+
+  res.status(200).json(response);
+});
+
+router.get('/task/:taskId/translate', (req: Request, res: Response) => {
+  const { taskId } = req.params;
+  const { targetLang = 'en' } = req.query;
+  
+  const taskWithFile = getTaskWithFile(taskId);
+  
+  if (!taskWithFile) {
+    const errorResponse: ErrorResponse = {
+      success: false,
+      message: '任务不存在',
+      code: 'TASK_NOT_FOUND'
+    };
+    return res.status(404).json(errorResponse);
+  }
+
+  const subtitles = getSubtitlesByTaskId(taskId);
+  
+  if (subtitles.length === 0) {
+    const errorResponse: ErrorResponse = {
+      success: false,
+      message: '该任务没有字幕数据',
+      code: 'NO_SUBTITLES'
+    };
+    return res.status(404).json(errorResponse);
+  }
+
+  const translatedSegments: TranslatedSegment[] = subtitles.map((sub, index) => ({
+    index: sub.segmentIndex,
+    startTime: sub.startTime,
+    endTime: sub.endTime,
+    originalText: sub.text,
+    translatedText: translateText(sub.text),
+    confidence: sub.confidence
+  }));
+
+  const fullOriginalText = translatedSegments.map(s => s.originalText).join('');
+  const fullTranslatedText = translatedSegments.map(s => s.translatedText).join(' ');
+  const totalDuration = translatedSegments.length > 0 
+    ? translatedSegments[translatedSegments.length - 1].endTime 
+    : 0;
+
+  const response: TranslationResponse = {
+    success: true,
+    message: '翻译成功',
+    data: {
+      taskId: taskId,
+      sourceLanguage: 'zh',
+      targetLanguage: String(targetLang),
+      totalDuration: totalDuration,
+      segmentCount: translatedSegments.length,
+      fullOriginalText: fullOriginalText,
+      fullTranslatedText: fullTranslatedText,
+      segments: translatedSegments
     }
   };
 

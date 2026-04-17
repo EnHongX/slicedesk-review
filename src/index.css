@@ -696,6 +696,108 @@ h1 {
   font-size: 14px;
 }
 
+.translate-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.translate-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+.translate-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.language-toggle-btn {
+  padding: 8px 16px;
+  border: 2px solid #e1e4e8;
+  background-color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.language-toggle-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.language-toggle-btn.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.export-btn-secondary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+}
+
+.export-btn-secondary:hover {
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+.translation-error {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bilingual-fulltext {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.fulltext-column {
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #e1e4e8;
+  overflow: hidden;
+}
+
+.fulltext-column .fulltext-header {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0f3ff 0%, #faf5ff 100%);
+  border-bottom: 1px solid #e1e4e8;
+  margin-bottom: 0;
+}
+
+.fulltext-column .fulltext-content {
+  padding: 16px;
+  border: none;
+  border-radius: 0;
+}
+
+.translated-text {
+  color: #667eea;
+  font-style: italic;
+}
+
 @media (max-width: 500px) {
   .task-type-options {
     grid-template-columns: 1fr;
@@ -718,5 +820,18 @@ h1 {
   .task-info {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .bilingual-fulltext {
+    grid-template-columns: 1fr;
+  }
+
+  .subtitle-actions {
+    flex-wrap: wrap;
+  }
+
+  .language-toggle-btn {
+    padding: 6px 12px;
+    font-size: 13px;
   }
 }
