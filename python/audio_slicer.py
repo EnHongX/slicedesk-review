@@ -1,8 +1,11 @@
 from pydub import AudioSegment
+from pydub.utils import mediainfo
 from typing import List, Dict, Optional, Tuple
 import os
 import math
 import shutil
+import traceback
+import subprocess
 from dataclasses import dataclass
 from enum import Enum
 
@@ -33,6 +36,7 @@ class SlicingResult:
     slice_duration: float
     slices: List[SliceInfo]
     error_message: Optional[str] = None
+    error_details: Optional[str] = None
 
 
 class AudioSlicer:
@@ -45,32 +49,59 @@ class AudioSlicer:
         AudioFormat.FLAC: ["flac"],
     }
 
-    def __init__(self, ffmpeg_path: Optional[str] = None):
-        if ffmpeg_path:
-            if not os.path.exists(ffmpeg_path):
-                raise FileNotFoundError(f"指定的 ffmpeg 路径不存在: {ffmpeg_path}")
-            AudioSegment.converter = ffmpeg_path
-        else:
-            self._auto_detect_ffmpeg()
+    def __init__(
+        self, 
+        ffmpeg_path: Optional[str] = None, 
+        ffprobe_path: Optional[str] = None
+    ):
+        self._configure_ffmpeg(ffmpeg_path, ffprobe_path)
 
-    def _auto_detect_ffmpeg(self):
-        common_paths = [
+    def _test_ffmpeg_binary(self, path: str) -> bool:
+        try:
+            result = subprocess.run(
+                [path, "-version"],
+                capture_output=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _configure_ffmpeg(
+        self, 
+        ffmpeg_path: Optional[str], 
+        ffprobe_path: Optional[str]
+    ):
+        ffmpeg_paths_to_try = [
+            ffmpeg_path,
             "/opt/homebrew/opt/ffmpeg/bin/ffmpeg",
             "/usr/local/bin/ffmpeg",
             "/usr/bin/ffmpeg",
         ]
         
-        for path in common_paths:
-            if os.path.exists(path):
-                try:
-                    AudioSegment.converter = path
-                    return
-                except Exception:
-                    continue
+        ffprobe_paths_to_try = [
+            ffprobe_path,
+            "/opt/homebrew/opt/ffmpeg/bin/ffprobe",
+            "/usr/local/bin/ffprobe",
+            "/usr/bin/ffprobe",
+        ]
         
-        system_ffmpeg = shutil.which("ffmpeg")
-        if system_ffmpeg:
-            AudioSegment.converter = system_ffmpeg
+        for path in ffmpeg_paths_to_try:
+            if path and os.path.exists(path) and self._test_ffmpeg_binary(path):
+                AudioSegment.converter = path
+                break
+        
+        for path in ffprobe_paths_to_try:
+            if path and os.path.exists(path) and self._test_ffmpeg_binary(path):
+                AudioSegment.ffprobe = path
+                break
+        
+        if hasattr(AudioSegment, 'converter') and AudioSegment.converter:
+            ffmpeg_dir = os.path.dirname(AudioSegment.converter)
+            if ffmpeg_dir and ffmpeg_dir != '/usr/bin' and ffmpeg_dir != '/bin':
+                current_path = os.environ.get('PATH', '')
+                if ffmpeg_dir not in current_path:
+                    os.environ['PATH'] = ffmpeg_dir + os.pathsep + current_path
 
     def _detect_format(self, file_path: str) -> AudioFormat:
         ext = os.path.splitext(file_path)[1].lower().lstrip(".")
@@ -79,9 +110,20 @@ class AudioSlicer:
                 return format_enum
         raise ValueError(f"不支持的音频格式: {ext}")
 
+    def _get_file_info(self, file_path: str) -> Dict:
+        try:
+            info = mediainfo(file_path)
+            return info
+        except Exception as e:
+            raise RuntimeError(f"获取媒体信息失败: {str(e)}")
+
     def _load_audio(self, file_path: str, audio_format: AudioFormat) -> AudioSegment:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"音频文件不存在: {file_path}")
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            raise ValueError(f"音频文件为空 (0 字节): {file_path}")
 
         try:
             if audio_format == AudioFormat.MP3:
@@ -99,7 +141,15 @@ class AudioSlicer:
             else:
                 return AudioSegment.from_file(file_path)
         except Exception as e:
-            raise RuntimeError(f"加载音频文件失败: {str(e)}")
+            tb_str = traceback.format_exc()
+            raise RuntimeError(
+                f"加载音频文件失败\n"
+                f"  文件: {file_path}\n"
+                f"  格式: {audio_format.value}\n"
+                f"  文件大小: {file_size} 字节\n"
+                f"  错误: {str(e)}\n"
+                f"  详细堆栈:\n{tb_str}"
+            )
 
     def calculate_slices(
         self, 
@@ -107,7 +157,23 @@ class AudioSlicer:
         slice_duration_seconds: float
     ) -> SlicingResult:
         try:
+            if not os.path.exists(file_path):
+                return SlicingResult(
+                    success=False,
+                    total_duration=0,
+                    slice_count=0,
+                    slice_duration=slice_duration_seconds,
+                    slices=[],
+                    error_message=f"文件不存在: {file_path}"
+                )
+            
             audio_format = self._detect_format(file_path)
+            
+            try:
+                media_info = self._get_file_info(file_path)
+            except Exception as e:
+                pass
+            
             audio = self._load_audio(file_path, audio_format)
             
             total_duration_ms = len(audio)
@@ -147,13 +213,15 @@ class AudioSlicer:
             )
             
         except Exception as e:
+            tb_str = traceback.format_exc()
             return SlicingResult(
                 success=False,
                 total_duration=0,
                 slice_count=0,
                 slice_duration=slice_duration_seconds,
                 slices=[],
-                error_message=str(e)
+                error_message=str(e),
+                error_details=tb_str
             )
 
     def slice_audio(
@@ -193,43 +261,73 @@ class AudioSlicer:
                 output_file_name = f"{base_name}_slice_{i:03d}.{actual_format.value}"
                 output_file_path = os.path.join(output_dir, output_file_name)
                 
-                if actual_format == AudioFormat.MP3:
-                    audio_slice.export(output_file_path, format="mp3")
-                elif actual_format == AudioFormat.WAV:
-                    audio_slice.export(output_file_path, format="wav")
-                elif actual_format == AudioFormat.OGG:
-                    audio_slice.export(output_file_path, format="ogg")
-                elif actual_format == AudioFormat.FLAC:
-                    audio_slice.export(output_file_path, format="flac")
-                elif actual_format == AudioFormat.M4A:
-                    audio_slice.export(output_file_path, format="m4a")
-                elif actual_format == AudioFormat.AAC:
-                    audio_slice.export(output_file_path, format="aac")
-                else:
-                    audio_slice.export(output_file_path, format=actual_format.value)
-                
-                result.slices[i].file_path = output_file_path
+                try:
+                    if actual_format == AudioFormat.MP3:
+                        audio_slice.export(output_file_path, format="mp3")
+                    elif actual_format == AudioFormat.WAV:
+                        audio_slice.export(output_file_path, format="wav")
+                    elif actual_format == AudioFormat.OGG:
+                        audio_slice.export(output_file_path, format="ogg")
+                    elif actual_format == AudioFormat.FLAC:
+                        audio_slice.export(output_file_path, format="flac")
+                    elif actual_format == AudioFormat.M4A:
+                        audio_slice.export(output_file_path, format="m4a")
+                    elif actual_format == AudioFormat.AAC:
+                        audio_slice.export(output_file_path, format="aac")
+                    else:
+                        audio_slice.export(output_file_path, format=actual_format.value)
+                    
+                    result.slices[i].file_path = output_file_path
+                except Exception as e:
+                    tb_str = traceback.format_exc()
+                    return SlicingResult(
+                        success=False,
+                        total_duration=result.total_duration,
+                        slice_count=result.slice_count,
+                        slice_duration=result.slice_duration,
+                        slices=result.slices[:i],
+                        error_message=f"导出切片 {i} 失败: {str(e)}",
+                        error_details=tb_str
+                    )
             
             return result
             
         except Exception as e:
+            tb_str = traceback.format_exc()
             return SlicingResult(
                 success=False,
                 total_duration=0,
                 slice_count=0,
                 slice_duration=slice_duration_seconds,
                 slices=[],
-                error_message=str(e)
+                error_message=str(e),
+                error_details=tb_str
             )
 
     def get_audio_info(self, file_path: str) -> Dict:
         try:
+            if not os.path.exists(file_path):
+                return {
+                    "success": False,
+                    "file_path": file_path,
+                    "error_message": f"文件不存在: {file_path}"
+                }
+            
+            file_size = os.path.getsize(file_path)
+            
             audio_format = self._detect_format(file_path)
+            
+            try:
+                media_info = self._get_file_info(file_path)
+            except Exception as e:
+                media_info = None
+            
             audio = self._load_audio(file_path, audio_format)
             
-            return {
+            info = {
                 "success": True,
                 "file_path": file_path,
+                "file_size_bytes": file_size,
                 "format": audio_format.value,
                 "duration_seconds": len(audio) / 1000.0,
                 "duration_ms": len(audio),
@@ -238,9 +336,16 @@ class AudioSlicer:
                 "sample_width": audio.sample_width,
                 "frame_count": audio.frame_count()
             }
+            
+            if media_info:
+                info["media_info"] = media_info
+            
+            return info
         except Exception as e:
+            tb_str = traceback.format_exc()
             return {
                 "success": False,
                 "file_path": file_path,
-                "error_message": str(e)
+                "error_message": str(e),
+                "error_details": tb_str
             }

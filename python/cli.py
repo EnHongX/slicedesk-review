@@ -4,7 +4,7 @@ import json
 from audio_slicer import AudioSlicer, SlicingResult, AudioFormat
 
 
-def print_result(result: SlicingResult, json_output: bool = False):
+def print_result(result: SlicingResult, json_output: bool = False, verbose: bool = False):
     if json_output:
         output = {
             "success": result.success,
@@ -24,6 +24,8 @@ def print_result(result: SlicingResult, json_output: bool = False):
         }
         if result.error_message:
             output["error_message"] = result.error_message
+        if verbose and result.error_details:
+            output["error_details"] = result.error_details
         print(json.dumps(output, indent=2, ensure_ascii=False))
     else:
         if result.success:
@@ -46,30 +48,50 @@ def print_result(result: SlicingResult, json_output: bool = False):
             print("音频切片失败！")
             print("=" * 60)
             print(f"错误信息: {result.error_message}")
+            if verbose and result.error_details:
+                print("-" * 60)
+                print("详细错误信息:")
+                print(result.error_details)
             print("=" * 60)
 
 
-def print_audio_info(info: dict, json_output: bool = False):
+def print_audio_info(info: dict, json_output: bool = False, verbose: bool = False):
     if json_output:
-        print(json.dumps(info, indent=2, ensure_ascii=False))
+        output = info.copy()
+        if not verbose and "error_details" in output:
+            del output["error_details"]
+        if not verbose and "media_info" in output:
+            del output["media_info"]
+        print(json.dumps(output, indent=2, ensure_ascii=False))
     else:
         if info.get("success"):
             print("=" * 60)
             print("音频文件信息")
             print("=" * 60)
             print(f"文件路径: {info['file_path']}")
+            print(f"文件大小: {info.get('file_size_bytes', 'N/A')} 字节")
             print(f"格式: {info['format']}")
             print(f"总时长: {info['duration_seconds']:.2f} 秒 ({info['duration_ms']} ms)")
             print(f"声道数: {info['channels']}")
             print(f"采样率: {info['frame_rate']} Hz")
             print(f"采样宽度: {info['sample_width']} 字节")
-            print(f"帧数: {info['frame_count']}")
+            print(f"帧数: {info.get('frame_count', 'N/A')}")
+            
+            if verbose and info.get("media_info"):
+                print("-" * 60)
+                print("媒体详细信息 (ffprobe):")
+                print(json.dumps(info["media_info"], indent=2, ensure_ascii=False))
+            
             print("=" * 60)
         else:
             print("=" * 60)
             print("获取音频信息失败！")
             print("=" * 60)
             print(f"错误信息: {info.get('error_message')}")
+            if verbose and info.get("error_details"):
+                print("-" * 60)
+                print("详细错误信息:")
+                print(info["error_details"])
             print("=" * 60)
 
 
@@ -92,12 +114,18 @@ def main():
   python cli.py info -f audio.mp3 --json
   python cli.py calculate -f audio.mp3 -d 300 --json
   
-  # 指定 ffmpeg 路径
-  python cli.py info -f audio.mp3 --ffmpeg /opt/homebrew/opt/ffmpeg/bin/ffmpeg
+  # 详细错误信息（用于调试）
+  python cli.py info -f audio.mp3 -v
+  python cli.py calculate -f audio.mp3 -d 300 -v
+  
+  # 指定 ffmpeg/ffprobe 路径
+  python cli.py info -f audio.mp3 --ffmpeg /opt/homebrew/opt/ffmpeg/bin/ffmpeg --ffprobe /opt/homebrew/opt/ffmpeg/bin/ffprobe
         """
     )
     
-    parser.add_argument("--ffmpeg", help="指定 ffmpeg 可执行文件路径（自动检测失败时使用）")
+    parser.add_argument("--ffmpeg", help="指定 ffmpeg 可执行文件路径")
+    parser.add_argument("--ffprobe", help="指定 ffprobe 可执行文件路径")
+    parser.add_argument("-v", "--verbose", action="store_true", help="显示详细错误信息和调试信息")
     
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
     
@@ -120,21 +148,30 @@ def main():
     
     args = parser.parse_args()
     
-    slicer = AudioSlicer(ffmpeg_path=args.ffmpeg)
+    if args.verbose:
+        print(f"[调试] ffmpeg 路径参数: {args.ffmpeg}")
+        print(f"[调试] ffprobe 路径参数: {args.ffprobe}")
+    
+    slicer = AudioSlicer(ffmpeg_path=args.ffmpeg, ffprobe_path=args.ffprobe)
+    
+    if args.verbose:
+        from pydub import AudioSegment
+        print(f"[调试] 使用的 ffmpeg: {AudioSegment.converter}")
+        print(f"[调试] 使用的 ffprobe: {AudioSegment.ffprobe}")
     
     if args.command == "info":
         if not os.path.exists(args.file):
             print(f"错误: 文件不存在 - {args.file}")
             return
         info = slicer.get_audio_info(args.file)
-        print_audio_info(info, args.json)
+        print_audio_info(info, args.json, args.verbose)
         
     elif args.command == "calculate":
         if not os.path.exists(args.file):
             print(f"错误: 文件不存在 - {args.file}")
             return
         result = slicer.calculate_slices(args.file, args.duration)
-        print_result(result, args.json)
+        print_result(result, args.json, args.verbose)
         
     elif args.command == "slice":
         if not os.path.exists(args.file):
@@ -151,7 +188,7 @@ def main():
             output_dir=args.output,
             output_format=output_format
         )
-        print_result(result, args.json)
+        print_result(result, args.json, args.verbose)
         
     else:
         parser.print_help()
