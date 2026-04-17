@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, AudioFile, TaskStatus, TaskWithFile } from './types.js';
+import { Task, AudioFile, TaskStatus, TaskWithFile, SliceInfo } from './types.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -38,6 +38,21 @@ export function initDatabase(): void {
 
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_audio_files_task_id ON audio_files(task_id);
+
+    CREATE TABLE IF NOT EXISTS slices (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      slice_index INTEGER NOT NULL,
+      start_time REAL NOT NULL,
+      end_time REAL NOT NULL,
+      duration REAL NOT NULL,
+      file_path TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_slices_task_id ON slices(task_id);
+    CREATE INDEX IF NOT EXISTS idx_slices_task_index ON slices(task_id, slice_index);
   `);
 
   console.log(`Database initialized at: ${DB_PATH}`);
@@ -155,4 +170,95 @@ export function getTaskWithFile(taskId: string): TaskWithFile | undefined {
     ...task,
     audioFile
   };
+}
+
+export function createSlice(
+  taskId: string,
+  sliceIndex: number,
+  startTime: number,
+  endTime: number,
+  duration: number,
+  filePath?: string
+): SliceInfo {
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const stmt = db.prepare(`
+    INSERT INTO slices (id, task_id, slice_index, start_time, end_time, duration, file_path, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  stmt.run(id, taskId, sliceIndex, startTime, endTime, duration, filePath || null, now);
+  
+  return {
+    id,
+    taskId,
+    sliceIndex,
+    startTime,
+    endTime,
+    duration,
+    filePath: filePath || undefined,
+    createdAt: now
+  };
+}
+
+export function createSlicesBulk(taskId: string, slices: Array<{
+  sliceIndex: number;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  filePath?: string;
+}>): void {
+  const insert = db.prepare(`
+    INSERT INTO slices (id, task_id, slice_index, start_time, end_time, duration, file_path, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  const now = new Date().toISOString();
+  
+  const insertMany = db.transaction((sliceList) => {
+    for (const slice of sliceList) {
+      const id = uuidv4();
+      insert.run(
+        id, 
+        taskId, 
+        slice.sliceIndex, 
+        slice.startTime, 
+        slice.endTime, 
+        slice.duration, 
+        slice.filePath || null, 
+        now
+      );
+    }
+  });
+  
+  insertMany(slices);
+}
+
+export function getSlicesByTaskId(taskId: string): SliceInfo[] {
+  const stmt = db.prepare(`
+    SELECT 
+      id,
+      task_id as taskId,
+      slice_index as sliceIndex,
+      start_time as startTime,
+      end_time as endTime,
+      duration,
+      file_path as filePath,
+      created_at as createdAt
+    FROM slices 
+    WHERE task_id = ?
+    ORDER BY slice_index ASC
+  `);
+  
+  return stmt.all(taskId) as SliceInfo[];
+}
+
+export function deleteSlicesByTaskId(taskId: string): void {
+  const stmt = db.prepare(`
+    DELETE FROM slices 
+    WHERE task_id = ?
+  `);
+  
+  stmt.run(taskId);
 }
