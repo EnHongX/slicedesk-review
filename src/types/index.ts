@@ -12,15 +12,18 @@ export interface UploadFormErrors {
 
 export type UploadStatus = 'idle' | 'loading' | 'success' | 'error';
 
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
 export interface UploadResponse {
   success: boolean;
   message: string;
   data?: {
-    id: string;
+    taskId: string;
+    status: TaskStatus;
+    createdAt: string;
     fileName: string;
     programName: string;
     episodeNumber: string;
-    uploadTime: string;
   };
 }
 
