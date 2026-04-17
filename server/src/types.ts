@@ -27,6 +27,7 @@ export interface Task {
   programName: string;
   episodeNumber: string;
   status: TaskStatus;
+  sliceDurationSeconds: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +52,7 @@ export interface UploadResponse {
     fileName: string;
     programName: string;
     episodeNumber: string;
+    sliceDurationSeconds: number;
   };
 }
 
@@ -62,6 +64,7 @@ export interface SlicesResponse {
     slices: SliceInfo[];
     totalDuration: number;
     sliceCount: number;
+    sliceDurationSeconds: number;
   };
 }
 

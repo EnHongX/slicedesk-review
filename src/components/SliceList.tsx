@@ -5,6 +5,7 @@ interface SliceListProps {
   slices: SliceInfo[];
   totalDuration: number;
   sliceCount: number;
+  sliceDurationSeconds: number;
   taskInfo?: {
     programName: string;
     episodeNumber: string;
@@ -28,7 +29,7 @@ function formatDuration(seconds: number): string {
   return `${mins} 分 ${secs} 秒`;
 }
 
-const SliceList: React.FC<SliceListProps> = ({ slices, totalDuration, sliceCount, taskInfo }) => {
+const SliceList: React.FC<SliceListProps> = ({ slices, totalDuration, sliceCount, sliceDurationSeconds, taskInfo }) => {
   if (slices.length === 0) {
     return (
       <div className="slice-list-container">
@@ -59,6 +60,9 @@ const SliceList: React.FC<SliceListProps> = ({ slices, totalDuration, sliceCount
         <div className="slice-summary">
           <span className="summary-item">
             <strong>切片数量：</strong>{sliceCount} 段
+          </span>
+          <span className="summary-item">
+            <strong>切片时长：</strong>{formatDuration(sliceDurationSeconds)}
           </span>
           <span className="summary-item">
             <strong>总时长：</strong>{formatDuration(totalDuration)}

@@ -20,6 +20,7 @@ export function initDatabase(): void {
       program_name TEXT NOT NULL,
       episode_number TEXT NOT NULL,
       status TEXT DEFAULT 'pending' NOT NULL,
+      slice_duration_seconds REAL DEFAULT 60 NOT NULL,
       created_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL,
       updated_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL
     );
@@ -65,22 +66,23 @@ export function closeDatabase(): void {
   }
 }
 
-export function createTask(programName: string, episodeNumber: string): Task {
+export function createTask(programName: string, episodeNumber: string, sliceDurationSeconds: number = 60): Task {
   const id = uuidv4();
   const now = new Date().toISOString();
   
   const stmt = db.prepare(`
-    INSERT INTO tasks (id, program_name, episode_number, status, created_at, updated_at)
-    VALUES (?, ?, ?, 'pending', ?, ?)
+    INSERT INTO tasks (id, program_name, episode_number, status, slice_duration_seconds, created_at, updated_at)
+    VALUES (?, ?, ?, 'pending', ?, ?, ?)
   `);
   
-  stmt.run(id, programName, episodeNumber, now, now);
+  stmt.run(id, programName, episodeNumber, sliceDurationSeconds, now, now);
   
   return {
     id,
     programName,
     episodeNumber,
     status: 'pending',
+    sliceDurationSeconds,
     createdAt: now,
     updatedAt: now
   };
@@ -93,6 +95,7 @@ export function getTaskById(taskId: string): Task | undefined {
       program_name as programName,
       episode_number as episodeNumber,
       status,
+      slice_duration_seconds as sliceDurationSeconds,
       created_at as createdAt,
       updated_at as updatedAt
     FROM tasks 

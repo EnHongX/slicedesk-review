@@ -65,6 +65,28 @@ export const validationUtils = {
     return undefined;
   },
 
+  validateSliceDurationSeconds(duration: string): string | undefined {
+    if (!duration || duration.trim() === '') {
+      return '请输入切片时长';
+    }
+
+    const durationNum = parseFloat(duration);
+    
+    if (isNaN(durationNum)) {
+      return '切片时长必须是有效的数字';
+    }
+
+    if (durationNum <= 0) {
+      return '切片时长必须大于 0';
+    }
+
+    if (durationNum > 3600) {
+      return '切片时长不能超过 3600 秒（1小时）';
+    }
+
+    return undefined;
+  },
+
   validateForm(formData: UploadFormData): UploadFormErrors {
     const errors: UploadFormErrors = {};
 
@@ -81,6 +103,11 @@ export const validationUtils = {
     const episodeError = this.validateEpisodeNumber(formData.episodeNumber);
     if (episodeError) {
       errors.episodeNumber = episodeError;
+    }
+
+    const sliceDurationError = this.validateSliceDurationSeconds(formData.sliceDurationSeconds);
+    if (sliceDurationError) {
+      errors.sliceDurationSeconds = sliceDurationError;
     }
 
     return errors;

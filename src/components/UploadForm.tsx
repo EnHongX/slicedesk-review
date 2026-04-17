@@ -8,7 +8,8 @@ const UploadForm: React.FC = () => {
   const [formData, setFormData] = useState<UploadFormData>({
     audioFile: null,
     programName: '',
-    episodeNumber: ''
+    episodeNumber: '',
+    sliceDurationSeconds: '60'
   });
 
   const [errors, setErrors] = useState<UploadFormErrors>({});
@@ -110,6 +111,28 @@ const UploadForm: React.FC = () => {
     }));
   };
 
+  const handleSliceDurationSecondsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, sliceDurationSeconds: value }));
+    
+    if (touched.sliceDurationSeconds) {
+      const error = validationUtils.validateSliceDurationSeconds(value);
+      setErrors(prev => ({
+        ...prev,
+        sliceDurationSeconds: error
+      }));
+    }
+  };
+
+  const handleSliceDurationSecondsBlur = () => {
+    setTouched(prev => ({ ...prev, sliceDurationSeconds: true }));
+    const error = validationUtils.validateSliceDurationSeconds(formData.sliceDurationSeconds);
+    setErrors(prev => ({
+      ...prev,
+      sliceDurationSeconds: error
+    }));
+  };
+
   const loadSlices = async (taskId: string) => {
     setLoadingSlices(true);
     try {
@@ -130,7 +153,8 @@ const UploadForm: React.FC = () => {
     const allTouched = {
       audioFile: true,
       programName: true,
-      episodeNumber: true
+      episodeNumber: true,
+      sliceDurationSeconds: true
     };
     setTouched(allTouched);
 
@@ -170,7 +194,8 @@ const UploadForm: React.FC = () => {
     setFormData({
       audioFile: null,
       programName: '',
-      episodeNumber: ''
+      episodeNumber: '',
+      sliceDurationSeconds: '60'
     });
     setErrors({});
     setTouched({});
@@ -285,6 +310,27 @@ const UploadForm: React.FC = () => {
           )}
         </div>
 
+        <div className="form-group">
+          <label htmlFor="sliceDurationSeconds">切片时长（秒）</label>
+          <input
+            id="sliceDurationSeconds"
+            type="number"
+            value={formData.sliceDurationSeconds}
+            onChange={handleSliceDurationSecondsChange}
+            onBlur={handleSliceDurationSecondsBlur}
+            placeholder="例如：60"
+            min="1"
+            max="3600"
+            step="1"
+            disabled={uploadStatus === 'loading'}
+            className={showError('sliceDurationSeconds') ? 'error' : ''}
+          />
+          
+          {showError('sliceDurationSeconds') && (
+            <div className="error-message">{errors.sliceDurationSeconds}</div>
+          )}
+        </div>
+
         <button
           type="submit"
           className="submit-btn"
@@ -338,6 +384,7 @@ const UploadForm: React.FC = () => {
             slices={slicesData.data.slices}
             totalDuration={slicesData.data.totalDuration}
             sliceCount={slicesData.data.sliceCount}
+            sliceDurationSeconds={slicesData.data.sliceDurationSeconds}
             taskInfo={
               successResponse?.data
                 ? {
