@@ -1,4 +1,5 @@
 export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TaskType = 'slice' | 'subtitle';
 
 export interface AudioFile {
   id: string;
@@ -27,6 +28,7 @@ export interface Task {
   programName: string;
   episodeNumber: string;
   status: TaskStatus;
+  taskType: TaskType;
   sliceDurationSeconds: number;
   createdAt: string;
   updatedAt: string;
@@ -72,4 +74,37 @@ export interface ErrorResponse {
   success: boolean;
   message: string;
   code?: string;
+}
+
+export interface SubtitleSegment {
+  index: number;
+  startTime: number;
+  endTime: number;
+  text: string;
+  confidence?: number;
+}
+
+export interface SubtitleInfo {
+  id: string;
+  taskId: string;
+  segmentIndex: number;
+  startTime: number;
+  endTime: number;
+  text: string;
+  confidence: number;
+  createdAt: string;
+}
+
+export interface SubtitleResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    taskId: string;
+    taskType: TaskType;
+    totalDuration: number;
+    segmentCount: number;
+    language: string;
+    fullText: string;
+    segments: SubtitleSegment[];
+  };
 }

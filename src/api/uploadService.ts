@@ -1,10 +1,10 @@
-import { UploadFormData, UploadResponse, UploadError, SlicesResponse } from '../types';
+import { UploadFormData, UploadResponse, UploadError, SlicesResponse, SubtitleResponse } from '../types';
 
 const API_BASE_URL = '/api';
 
 export const uploadService = {
   async uploadAudio(formData: UploadFormData, onProgress?: (progress: number) => void): Promise<UploadResponse> {
-    const { audioFile, programName, episodeNumber, sliceDurationSeconds } = formData;
+    const { audioFile, programName, episodeNumber, sliceDurationSeconds, taskType } = formData;
     
     if (!audioFile) {
       throw {
@@ -18,6 +18,7 @@ export const uploadService = {
     formDataObj.append('programName', programName);
     formDataObj.append('episodeNumber', episodeNumber);
     formDataObj.append('sliceDurationSeconds', sliceDurationSeconds);
+    formDataObj.append('taskType', taskType);
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -44,7 +45,8 @@ export const uploadService = {
                 createdAt: new Date().toISOString(),
                 fileName: audioFile.name,
                 programName,
-                episodeNumber
+                episodeNumber,
+                taskType
               }
             });
           }
@@ -113,8 +115,32 @@ export const uploadService = {
     }
   },
 
+  async getTaskSubtitles(taskId: string): Promise<SubtitleResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/task/${taskId}/subtitles`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw {
+          message: errorData.message || '获取字幕失败',
+          code: `HTTP_${response.status}`
+        } as UploadError;
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw {
+          message: error.message,
+          code: 'NETWORK_ERROR'
+        } as UploadError;
+      }
+      throw error;
+    }
+  },
+
   async mockUpload(formData: UploadFormData, onProgress?: (progress: number) => void): Promise<UploadResponse> {
-    const { audioFile, programName, episodeNumber, sliceDurationSeconds } = formData;
+    const { audioFile, programName, episodeNumber, sliceDurationSeconds, taskType } = formData;
     
     if (!audioFile) {
       throw {
@@ -149,7 +175,8 @@ export const uploadService = {
         fileName: audioFile.name,
         programName,
         episodeNumber,
-        sliceDurationSeconds: parseFloat(sliceDurationSeconds) || 60
+        sliceDurationSeconds: parseFloat(sliceDurationSeconds) || 60,
+        taskType
       }
     };
   }

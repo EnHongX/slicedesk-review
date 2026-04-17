@@ -1,15 +1,17 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { UploadFormData, UploadFormErrors, UploadStatus, UploadResponse, UploadError, SlicesResponse } from '../types';
+import { UploadFormData, UploadFormErrors, UploadStatus, UploadResponse, UploadError, SlicesResponse, SubtitleResponse, TaskType } from '../types';
 import { validationUtils, formatFileSize } from '../utils/validation';
 import { uploadService } from '../api/uploadService';
 import SliceList from './SliceList';
+import SubtitleList from './SubtitleList';
 
 const UploadForm: React.FC = () => {
   const [formData, setFormData] = useState<UploadFormData>({
     audioFile: null,
     programName: '',
     episodeNumber: '',
-    sliceDurationSeconds: '60'
+    sliceDurationSeconds: '60',
+    taskType: 'slice'
   });
 
   const [errors, setErrors] = useState<UploadFormErrors>({});
@@ -22,8 +24,16 @@ const UploadForm: React.FC = () => {
   const [slicesData, setSlicesData] = useState<SlicesResponse | null>(null);
   const [showSlices, setShowSlices] = useState<boolean>(false);
   const [loadingSlices, setLoadingSlices] = useState<boolean>(false);
+  const [subtitleData, setSubtitleData] = useState<SubtitleResponse | null>(null);
+  const [showSubtitles, setShowSubtitles] = useState<boolean>(false);
+  const [loadingSubtitles, setLoadingSubtitles] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTaskTypeChange = (type: TaskType) => {
+    setFormData(prev => ({ ...prev, taskType: type }));
+    setTouched(prev => ({ ...prev, taskType: true }));
+  };
 
   const handleFileChange = useCallback((file: File | null) => {
     setFormData(prev => ({ ...prev, audioFile: file }));
@@ -147,6 +157,20 @@ const UploadForm: React.FC = () => {
     }
   };
 
+  const loadSubtitles = async (taskId: string) => {
+    setLoadingSubtitles(true);
+    try {
+      const response = await uploadService.getTaskSubtitles(taskId);
+      setSubtitleData(response);
+      setShowSubtitles(true);
+    } catch (err) {
+      const error = err as UploadError;
+      console.error('获取字幕失败:', error.message);
+    } finally {
+      setLoadingSubtitles(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -154,7 +178,8 @@ const UploadForm: React.FC = () => {
       audioFile: true,
       programName: true,
       episodeNumber: true,
-      sliceDurationSeconds: true
+      sliceDurationSeconds: true,
+      taskType: true
     };
     setTouched(allTouched);
 
@@ -171,6 +196,8 @@ const UploadForm: React.FC = () => {
     setErrorMessage('');
     setSlicesData(null);
     setShowSlices(false);
+    setSubtitleData(null);
+    setShowSubtitles(false);
 
     try {
       const response = await uploadService.uploadAudio(formData, (progress) => {
@@ -181,7 +208,11 @@ const UploadForm: React.FC = () => {
       setSuccessResponse(response);
 
       if (response.data?.taskId) {
-        await loadSlices(response.data.taskId);
+        if (formData.taskType === 'slice') {
+          await loadSlices(response.data.taskId);
+        } else if (formData.taskType === 'subtitle') {
+          await loadSubtitles(response.data.taskId);
+        }
       }
     } catch (err) {
       const error = err as UploadError;
@@ -195,7 +226,8 @@ const UploadForm: React.FC = () => {
       audioFile: null,
       programName: '',
       episodeNumber: '',
-      sliceDurationSeconds: '60'
+      sliceDurationSeconds: '60',
+      taskType: 'slice'
     });
     setErrors({});
     setTouched({});
@@ -205,6 +237,8 @@ const UploadForm: React.FC = () => {
     setErrorMessage('');
     setSlicesData(null);
     setShowSlices(false);
+    setSubtitleData(null);
+    setShowSubtitles(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -219,6 +253,8 @@ const UploadForm: React.FC = () => {
   const showError = (field: keyof UploadFormErrors): boolean => {
     return touched[field] === true && errors[field] !== undefined;
   };
+
+  const isLoadingResults = loadingSlices || loadingSubtitles;
 
   return (
     <div className="container">
@@ -274,6 +310,38 @@ const UploadForm: React.FC = () => {
         </div>
 
         <div className="form-group">
+          <label>处理方式</label>
+          <div className="task-type-options">
+            <label className={`task-type-option ${formData.taskType === 'slice' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="taskType"
+                value="slice"
+                checked={formData.taskType === 'slice'}
+                onChange={() => handleTaskTypeChange('slice')}
+                disabled={uploadStatus === 'loading'}
+              />
+              <span className="task-type-icon">✂️</span>
+              <span className="task-type-label">切片</span>
+              <span className="task-type-desc">将音频按指定时长切分成多个片段</span>
+            </label>
+            <label className={`task-type-option ${formData.taskType === 'subtitle' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="taskType"
+                value="subtitle"
+                checked={formData.taskType === 'subtitle'}
+                onChange={() => handleTaskTypeChange('subtitle')}
+                disabled={uploadStatus === 'loading'}
+              />
+              <span className="task-type-icon">📝</span>
+              <span className="task-type-label">字幕生成</span>
+              <span className="task-type-desc">自动识别音频内容生成中文字幕</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="form-group">
           <label htmlFor="programName">节目名称</label>
           <input
             id="programName"
@@ -310,26 +378,28 @@ const UploadForm: React.FC = () => {
           )}
         </div>
 
-        <div className="form-group">
-          <label htmlFor="sliceDurationSeconds">切片时长（秒）</label>
-          <input
-            id="sliceDurationSeconds"
-            type="number"
-            value={formData.sliceDurationSeconds}
-            onChange={handleSliceDurationSecondsChange}
-            onBlur={handleSliceDurationSecondsBlur}
-            placeholder="例如：60"
-            min="1"
-            max="3600"
-            step="1"
-            disabled={uploadStatus === 'loading'}
-            className={showError('sliceDurationSeconds') ? 'error' : ''}
-          />
-          
-          {showError('sliceDurationSeconds') && (
-            <div className="error-message">{errors.sliceDurationSeconds}</div>
-          )}
-        </div>
+        {formData.taskType === 'slice' && (
+          <div className="form-group">
+            <label htmlFor="sliceDurationSeconds">切片时长（秒）</label>
+            <input
+              id="sliceDurationSeconds"
+              type="number"
+              value={formData.sliceDurationSeconds}
+              onChange={handleSliceDurationSecondsChange}
+              onBlur={handleSliceDurationSecondsBlur}
+              placeholder="例如：60"
+              min="1"
+              max="3600"
+              step="1"
+              disabled={uploadStatus === 'loading'}
+              className={showError('sliceDurationSeconds') ? 'error' : ''}
+            />
+            
+            {showError('sliceDurationSeconds') && (
+              <div className="error-message">{errors.sliceDurationSeconds}</div>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"
@@ -348,7 +418,7 @@ const UploadForm: React.FC = () => {
           )}
         </button>
 
-        {uploadStatus === 'success' && successResponse && !showSlices && (
+        {uploadStatus === 'success' && successResponse && !showSlices && !showSubtitles && (
           <div className="status-message success">
             <span className="status-icon">✅</span>
             <div>
@@ -356,7 +426,7 @@ const UploadForm: React.FC = () => {
               <p>任务ID：{successResponse.data?.taskId}</p>
               <p>节目：{successResponse.data?.programName} | 第 {successResponse.data?.episodeNumber} 期</p>
               <p>当前状态：{successResponse.data?.status}</p>
-              {loadingSlices && <p className="loading-text">正在加载切片列表...</p>}
+              {isLoadingResults && <p className="loading-text">正在加载{formData.taskType === 'slice' ? '切片' : '字幕'}...</p>}
             </div>
             <button type="button" className="reset-btn" onClick={handleReset}>
               重置
@@ -385,6 +455,28 @@ const UploadForm: React.FC = () => {
             totalDuration={slicesData.data.totalDuration}
             sliceCount={slicesData.data.sliceCount}
             sliceDurationSeconds={slicesData.data.sliceDurationSeconds}
+            taskInfo={
+              successResponse?.data
+                ? {
+                    programName: successResponse.data.programName,
+                    episodeNumber: successResponse.data.episodeNumber,
+                    fileName: successResponse.data.fileName
+                  }
+                : undefined
+            }
+          />
+          <div className="action-buttons">
+            <button type="button" className="reset-btn" onClick={handleReset}>
+              返回上传
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showSubtitles && subtitleData && subtitleData.data && (
+        <div className="subtitle-section">
+          <SubtitleList
+            subtitleData={subtitleData}
             taskInfo={
               successResponse?.data
                 ? {

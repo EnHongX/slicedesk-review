@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, AudioFile, TaskStatus, TaskWithFile, SliceInfo } from './types.js';
+import { Task, AudioFile, TaskStatus, TaskWithFile, SliceInfo, TaskType, SubtitleInfo, SubtitleSegment } from './types.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,6 +26,43 @@ function migrateDatabase(): void {
       throw error;
     }
   }
+
+  try {
+    db.exec(`
+      ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT 'slice' NOT NULL;
+    `);
+    console.log('Migrating database: adding task_type column to tasks table...');
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('duplicate column name')) {
+      // Column already exists, no action needed
+    } else {
+      console.error('Database migration failed:', error);
+      throw error;
+    }
+  }
+
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS subtitles (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        segment_index INTEGER NOT NULL,
+        start_time REAL NOT NULL,
+        end_time REAL NOT NULL,
+        text TEXT NOT NULL,
+        confidence REAL DEFAULT 1.0 NOT NULL,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL,
+        FOREIGN KEY (task_id) REFERENCES tasks(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_subtitles_task_id ON subtitles(task_id);
+      CREATE INDEX IF NOT EXISTS idx_subtitles_task_index ON subtitles(task_id, segment_index);
+    `);
+    console.log('Migrating database: creating subtitles table...');
+  } catch (error) {
+    console.error('Database migration failed for subtitles:', error);
+    throw error;
+  }
 }
 
 export function initDatabase(): void {
@@ -37,6 +74,7 @@ export function initDatabase(): void {
       program_name TEXT NOT NULL,
       episode_number TEXT NOT NULL,
       status TEXT DEFAULT 'pending' NOT NULL,
+      task_type TEXT DEFAULT 'slice' NOT NULL,
       slice_duration_seconds REAL DEFAULT 60 NOT NULL,
       created_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL,
       updated_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL
@@ -71,6 +109,21 @@ export function initDatabase(): void {
 
     CREATE INDEX IF NOT EXISTS idx_slices_task_id ON slices(task_id);
     CREATE INDEX IF NOT EXISTS idx_slices_task_index ON slices(task_id, slice_index);
+
+    CREATE TABLE IF NOT EXISTS subtitles (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      segment_index INTEGER NOT NULL,
+      start_time REAL NOT NULL,
+      end_time REAL NOT NULL,
+      text TEXT NOT NULL,
+      confidence REAL DEFAULT 1.0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now', 'localtime')) NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_subtitles_task_id ON subtitles(task_id);
+    CREATE INDEX IF NOT EXISTS idx_subtitles_task_index ON subtitles(task_id, segment_index);
   `);
 
   migrateDatabase();
@@ -85,22 +138,28 @@ export function closeDatabase(): void {
   }
 }
 
-export function createTask(programName: string, episodeNumber: string, sliceDurationSeconds: number = 60): Task {
+export function createTask(
+  programName: string, 
+  episodeNumber: string, 
+  sliceDurationSeconds: number = 60,
+  taskType: TaskType = 'slice'
+): Task {
   const id = uuidv4();
   const now = new Date().toISOString();
   
   const stmt = db.prepare(`
-    INSERT INTO tasks (id, program_name, episode_number, status, slice_duration_seconds, created_at, updated_at)
-    VALUES (?, ?, ?, 'pending', ?, ?, ?)
+    INSERT INTO tasks (id, program_name, episode_number, status, task_type, slice_duration_seconds, created_at, updated_at)
+    VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)
   `);
   
-  stmt.run(id, programName, episodeNumber, sliceDurationSeconds, now, now);
+  stmt.run(id, programName, episodeNumber, taskType, sliceDurationSeconds, now, now);
   
   return {
     id,
     programName,
     episodeNumber,
     status: 'pending',
+    taskType,
     sliceDurationSeconds,
     createdAt: now,
     updatedAt: now
@@ -114,6 +173,7 @@ export function getTaskById(taskId: string): Task | undefined {
       program_name as programName,
       episode_number as episodeNumber,
       status,
+      task_type as taskType,
       slice_duration_seconds as sliceDurationSeconds,
       created_at as createdAt,
       updated_at as updatedAt
@@ -279,6 +339,91 @@ export function getSlicesByTaskId(taskId: string): SliceInfo[] {
 export function deleteSlicesByTaskId(taskId: string): void {
   const stmt = db.prepare(`
     DELETE FROM slices 
+    WHERE task_id = ?
+  `);
+  
+  stmt.run(taskId);
+}
+
+export function createSubtitle(
+  taskId: string,
+  segmentIndex: number,
+  startTime: number,
+  endTime: number,
+  text: string,
+  confidence: number = 1.0
+): SubtitleInfo {
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const stmt = db.prepare(`
+    INSERT INTO subtitles (id, task_id, segment_index, start_time, end_time, text, confidence, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  stmt.run(id, taskId, segmentIndex, startTime, endTime, text, confidence, now);
+  
+  return {
+    id,
+    taskId,
+    segmentIndex,
+    startTime,
+    endTime,
+    text,
+    confidence,
+    createdAt: now
+  };
+}
+
+export function createSubtitlesBulk(taskId: string, segments: SubtitleSegment[]): void {
+  const insert = db.prepare(`
+    INSERT INTO subtitles (id, task_id, segment_index, start_time, end_time, text, confidence, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  const now = new Date().toISOString();
+  
+  const insertMany = db.transaction((segmentList: SubtitleSegment[]) => {
+    for (const seg of segmentList) {
+      const id = uuidv4();
+      insert.run(
+        id,
+        taskId,
+        seg.index,
+        seg.startTime,
+        seg.endTime,
+        seg.text,
+        seg.confidence || 1.0,
+        now
+      );
+    }
+  });
+  
+  insertMany(segments);
+}
+
+export function getSubtitlesByTaskId(taskId: string): SubtitleInfo[] {
+  const stmt = db.prepare(`
+    SELECT 
+      id,
+      task_id as taskId,
+      segment_index as segmentIndex,
+      start_time as startTime,
+      end_time as endTime,
+      text,
+      confidence,
+      created_at as createdAt
+    FROM subtitles 
+    WHERE task_id = ?
+    ORDER BY segment_index ASC
+  `);
+  
+  return stmt.all(taskId) as SubtitleInfo[];
+}
+
+export function deleteSubtitlesByTaskId(taskId: string): void {
+  const stmt = db.prepare(`
+    DELETE FROM subtitles 
     WHERE task_id = ?
   `);
   
